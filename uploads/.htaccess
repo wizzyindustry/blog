@@ -1,0 +1,11 @@
+# Security: uploaded files are images only. Never execute scripts from this folder.
+<FilesMatch "\.(php|php\d|phtml|phar|pl|py|cgi|sh|html?|svgz?)$">
+    Require all denied
+</FilesMatch>
+
+# Allow the bundled sample SVG images that ship with the project
+<FilesMatch "^(default-post|architectural-design|design-principles|design-systems|dodoma-history|exam-techniques|history-education|library-resources|udom-registration)\.svg$">
+    Require all granted
+</FilesMatch>
+
+Options -Indexes

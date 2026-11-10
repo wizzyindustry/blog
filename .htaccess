@@ -1,0 +1,10 @@
+# Open the landing page first when visiting the project folder
+# (e.g. http://localhost/udom-blog). index.php remains the materials listing.
+DirectoryIndex landing.php index.php
+
+# Hide folder listings
+Options -Indexes
+
+# Block direct web access to internal folders and files
+RedirectMatch 404 ^/[^/]+/(config|includes|sql)/
+RedirectMatch 404 /\.(git|env)
