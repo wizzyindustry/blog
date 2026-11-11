@@ -1,0 +1,3 @@
+# Documents are never served directly. Visitors get them through
+# download.php, which sets safe headers and counts downloads.
+Require all denied

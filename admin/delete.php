@@ -16,7 +16,7 @@ $post_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_valid()) {
     flash('error', 'Delete request rejected. Please use the Delete button on the dashboard.');
-    header('Location: dashboard.php');
+    header('Location: posts.php');
     exit;
 }
 
@@ -27,11 +27,20 @@ try {
     $post = $stmt->fetch();
 
     if ($post) {
+        // Remember the attached documents (their rows are removed by ON DELETE CASCADE)
+        $attachments = get_post_attachments($pdo, $post_id);
+
         $del = $pdo->prepare('DELETE FROM posts WHERE id = :id');
         $del->execute([':id' => $post_id]);
 
+        // Clean up the files on disk
         delete_uploaded_image($post['image']);
-        flash('success', 'Post "' . $post['title'] . '" and its comments were deleted.');
+        foreach ($attachments as $doc) {
+            delete_document_file($doc['file_name']);
+        }
+
+        $extra = $attachments ? ', comments and ' . count($attachments) . ' document(s)' : ' and its comments';
+        flash('success', 'Post "' . $post['title'] . '"' . $extra . ' were deleted.');
     } else {
         flash('error', 'Post not found or already deleted.');
     }
@@ -39,5 +48,5 @@ try {
     flash('error', 'The post could not be deleted. Please try again.');
 }
 
-header('Location: dashboard.php');
+header('Location: posts.php');
 exit;

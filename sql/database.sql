@@ -6,7 +6,11 @@
 CREATE DATABASE IF NOT EXISTS `udom_blog` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `udom_blog`;
 
--- Drop existing tables if re-importing
+-- Drop existing tables if re-importing (children first)
+DROP TABLE IF EXISTS `user_logins`;
+DROP TABLE IF EXISTS `user_files`;
+DROP TABLE IF EXISTS `users`;
+DROP TABLE IF EXISTS `attachments`;
 DROP TABLE IF EXISTS `comments`;
 DROP TABLE IF EXISTS `posts`;
 DROP TABLE IF EXISTS `categories`;
@@ -69,6 +73,7 @@ CREATE TABLE `posts` (
   `image_ratio` VARCHAR(10) NOT NULL DEFAULT 'auto',
   `image_width` INT UNSIGNED DEFAULT NULL,   -- Real pixel size, read when uploaded
   `image_height` INT UNSIGNED DEFAULT NULL,
+  `allow_image_download` TINYINT(1) NOT NULL DEFAULT 0, -- 1 = show a Download Image button
   `author` VARCHAR(100) DEFAULT 'UDOM Student Materials',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -123,6 +128,24 @@ INSERT INTO `comments` (`id`, `post_id`, `name`, `comment`, `created_at`) VALUES
 (6, 7, 'Zainab Rashid', 'Active recall transformed how I prepare for continuous assessment tests. Excellent academic advice.', '2026-11-05 16:40:00');
 
 -- --------------------------------------------------------
+-- Table structure for table `attachments`
+-- Documents (PDF, Word, PowerPoint) attached to a post by the admin.
+-- Files live in uploads/documents/ under a random name and are only
+-- served through download.php. Rows are removed with their post.
+-- --------------------------------------------------------
+CREATE TABLE `attachments` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `post_id` INT NOT NULL,
+  `original_name` VARCHAR(255) NOT NULL,   -- File name shown to visitors
+  `file_name` VARCHAR(255) NOT NULL UNIQUE, -- Random name on disk
+  `file_type` VARCHAR(10) NOT NULL,        -- pdf, doc, docx, ppt, pptx
+  `file_size` INT UNSIGNED NOT NULL,
+  `download_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
 -- Table structure for table `login_attempts`
 -- Records failed admin logins so admin/login.php can block
 -- brute-force attacks (5 failures per IP in 15 minutes).
@@ -134,3 +157,119 @@ CREATE TABLE `login_attempts` (
   `attempted_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_ip_time` (`ip_address`, `attempted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================================================
+-- User accounts, user uploads, activity tracking and scaling indexes
+-- (same as sql/upgrade_v2_users.sql, which upgrades an existing database)
+-- ==============================================================
+
+
+-- --------------------------------------------------------
+-- Registered users (students). Separate from `admins`.
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `full_name` VARCHAR(120) NOT NULL,
+  `username` VARCHAR(50) NOT NULL,
+  `email` VARCHAR(190) NOT NULL,
+  `password` VARCHAR(255) NOT NULL,
+  `avatar` VARCHAR(255) DEFAULT NULL,           -- File in uploads/avatars/
+  `bio` VARCHAR(300) DEFAULT NULL,
+  `status` ENUM('active','blocked') NOT NULL DEFAULT 'active',
+  `file_count` INT UNSIGNED NOT NULL DEFAULT 0,  -- Kept in sync on upload/delete (no COUNT(*) per page)
+  `storage_used` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `last_login_at` DATETIME DEFAULT NULL,
+  `last_seen_at` DATETIME DEFAULT NULL,          -- Updated at most once a minute while browsing
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_users_username` (`username`),
+  UNIQUE KEY `uq_users_email` (`email`),
+  KEY `idx_users_last_seen` (`last_seen_at`),
+  KEY `idx_users_created` (`created_at`),
+  KEY `idx_users_status_created` (`status`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Files uploaded by users (any type). Stored under a random
+-- name in uploads/user_files/ (web access denied) and served
+-- only through account/file.php.
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `user_files` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT UNSIGNED NOT NULL,
+  `original_name` VARCHAR(255) NOT NULL,
+  `file_name` VARCHAR(100) NOT NULL,
+  `extension` VARCHAR(20) NOT NULL DEFAULT '',
+  `mime_type` VARCHAR(150) NOT NULL DEFAULT 'application/octet-stream',
+  `file_kind` VARCHAR(20) NOT NULL DEFAULT 'other', -- image, document, video, audio, archive, code, other
+  `file_size` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `width` INT UNSIGNED DEFAULT NULL,
+  `height` INT UNSIGNED DEFAULT NULL,
+  `description` VARCHAR(300) DEFAULT NULL,
+  `download_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_user_files_name` (`file_name`),
+  KEY `idx_user_files_user_created` (`user_id`, `created_at`),
+  KEY `idx_user_files_user_kind` (`user_id`, `file_kind`),
+  KEY `idx_user_files_created` (`created_at`),
+  KEY `idx_user_files_kind` (`file_kind`),
+  CONSTRAINT `fk_user_files_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- One row per successful user login (login trend chart).
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `user_logins` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT UNSIGNED NOT NULL,
+  `ip_address` VARCHAR(45) NOT NULL,
+  `user_agent` VARCHAR(255) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_user_logins_created` (`created_at`),
+  KEY `idx_user_logins_user_created` (`user_id`, `created_at`),
+  CONSTRAINT `fk_user_logins_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Failed-login table is now shared by admin and user logins.
+-- `scope` keeps their lockouts separate.
+-- --------------------------------------------------------
+ALTER TABLE `login_attempts`
+  ADD COLUMN IF NOT EXISTS `scope` VARCHAR(10) NOT NULL DEFAULT 'admin' AFTER `id`;
+ALTER TABLE `login_attempts`
+  ADD INDEX IF NOT EXISTS `idx_scope_ip_time` (`scope`, `ip_address`, `attempted_at`),
+  ADD INDEX IF NOT EXISTS `idx_attempted_at` (`attempted_at`);
+
+-- --------------------------------------------------------
+-- Indexes for fast listing / sorting with many rows
+-- --------------------------------------------------------
+ALTER TABLE `posts`
+  ADD INDEX IF NOT EXISTS `idx_posts_created` (`created_at`, `id`),
+  ADD INDEX IF NOT EXISTS `idx_posts_category_created` (`category`, `created_at`);
+
+ALTER TABLE `comments`
+  ADD INDEX IF NOT EXISTS `idx_comments_post_created` (`post_id`, `created_at`),
+  ADD INDEX IF NOT EXISTS `idx_comments_created` (`created_at`);
+
+ALTER TABLE `attachments`
+  ADD INDEX IF NOT EXISTS `idx_attachments_post` (`post_id`, `id`);
+
+-- ==============================================================
+-- Sharing user files on the Materials page
+-- (same as sql/upgrade_v3_sharing.sql)
+-- ==============================================================
+
+
+ALTER TABLE `user_files`
+  ADD COLUMN IF NOT EXISTS `title` VARCHAR(200) DEFAULT NULL AFTER `original_name`,
+  ADD COLUMN IF NOT EXISTS `visibility` ENUM('private','public') NOT NULL DEFAULT 'private' AFTER `description`,
+  ADD COLUMN IF NOT EXISTS `category` VARCHAR(100) DEFAULT NULL AFTER `visibility`;
+
+ALTER TABLE `user_files`
+  ADD INDEX IF NOT EXISTS `idx_user_files_public_created` (`visibility`, `created_at`),
+  ADD INDEX IF NOT EXISTS `idx_user_files_public_category` (`visibility`, `category`, `created_at`),
+  ADD INDEX IF NOT EXISTS `idx_user_files_public_ext` (`visibility`, `extension`, `created_at`);
+
+ALTER TABLE `user_files`
+  ADD CONSTRAINT `fk_user_files_category` FOREIGN KEY IF NOT EXISTS (`category`)
+    REFERENCES `categories` (`name`) ON UPDATE CASCADE ON DELETE SET NULL;

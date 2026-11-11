@@ -1,0 +1,2 @@
+# Files are delivered only through account/file.php with safe headers.
+Require all denied

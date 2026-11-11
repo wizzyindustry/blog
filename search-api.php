@@ -11,13 +11,15 @@ header('Cache-Control: no-store');
 
 require_once __DIR__ . '/config/db.php';
 
-$search = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
+$search = trim(input_text($_GET, 'q'));
 $search = mb_substr($search, 0, 100);
-$category = normalize_category($_GET['category'] ?? '');
+$category = normalize_category(input_text($_GET, 'category'));
 $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
 
 try {
     $result = get_posts_page($pdo, $search, $category, $page);
+    $shared = get_shared_files_page($pdo, $search, $category, 'any', 1, 8);
+    $shared_query = http_build_query(array_filter(['q' => $search, 'category' => $category], 'strlen'));
 
     echo json_encode([
         'status' => 'success',
@@ -28,6 +30,10 @@ try {
         'html' => render_posts_grid($result['posts']),
         'pagination' => render_pagination($result['page'], $result['total_pages'], $search, $category),
         'summary' => render_results_summary($result['total'], $search, $category),
+        // Files shared by students for the same search / category
+        'shared_html' => render_shared_grid($shared['files'], 'No shared files match your search or category.'),
+        'shared_total' => number_format($shared['total']),
+        'shared_url' => 'shared.php' . ($shared_query !== '' ? '?' . $shared_query : ''),
     ]);
 } catch (PDOException $e) {
     http_response_code(500);

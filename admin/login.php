@@ -26,68 +26,25 @@ if (!empty($_SESSION['admin_logged_in'])) {
   exit;
 }
 
-const LOGIN_MAX_ATTEMPTS = 5;      // Failed attempts allowed...
-const LOGIN_WINDOW_MINUTES = 15;   // ...within this many minutes
+// Brute-force limits and helpers are shared with the user login (includes/users.php)
+const LOGIN_MAX_ATTEMPTS = LOGIN_MAX_ATTEMPTS_PER_IP;
+const LOGIN_WINDOW_MINUTES = LOGIN_LOCK_MINUTES;
 
 // Valid bcrypt hash of a random value. Used when the username does not exist so
 // password_verify() still runs and response time does not reveal valid usernames.
 const DUMMY_PASSWORD_HASH = '$2y$10$vEGjxeVLC.Mcw6lFwgSv0eTmngPJWNsORMmSM6TCMURmLwckJu5mu';
 
-/**
- * Number of recent failed logins from this IP address.
- * Returns 0 if the login_attempts table is missing (login still works).
- */
-function recent_failed_attempts(PDO $pdo, string $ip): int
-{
-  try {
-    $stmt = $pdo->prepare(
-      'SELECT COUNT(*) FROM login_attempts
-       WHERE ip_address = :ip AND attempted_at > (NOW() - INTERVAL ' . LOGIN_WINDOW_MINUTES . ' MINUTE)'
-    );
-    $stmt->bindValue(':ip', $ip, PDO::PARAM_STR);
-    $stmt->execute();
-    return (int) $stmt->fetchColumn();
-  } catch (PDOException $e) {
-    return 0;
-  }
-}
-
-/** Record one failed login attempt. */
-function record_failed_attempt(PDO $pdo, string $ip, string $username): void
-{
-  try {
-    $stmt = $pdo->prepare('INSERT INTO login_attempts (ip_address, username) VALUES (:ip, :username)');
-    $stmt->bindValue(':ip', $ip, PDO::PARAM_STR);
-    $stmt->bindValue(':username', mb_substr($username, 0, 100), PDO::PARAM_STR);
-    $stmt->execute();
-  } catch (PDOException $e) {
-    // Table missing: ignore, rate limiting is simply skipped
-  }
-}
-
-/** Clear failed attempts after a successful login, and prune old rows. */
-function clear_failed_attempts(PDO $pdo, string $ip): void
-{
-  try {
-    $stmt = $pdo->prepare('DELETE FROM login_attempts WHERE ip_address = :ip OR attempted_at < (NOW() - INTERVAL 1 DAY)');
-    $stmt->bindValue(':ip', $ip, PDO::PARAM_STR);
-    $stmt->execute();
-  } catch (PDOException $e) {
-    // Ignore
-  }
-}
-
 $client_ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 $error_msg = '';
 $username = '';
-$locked = recent_failed_attempts($pdo, $client_ip) >= LOGIN_MAX_ATTEMPTS;
+$locked = recent_failed_logins($pdo, 'admin', $client_ip) >= LOGIN_MAX_ATTEMPTS;
 
 if ($locked) {
   $error_msg = 'Too many failed login attempts. Please wait ' . LOGIN_WINDOW_MINUTES . ' minutes and try again.';
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $username = isset($_POST['username']) && is_string($_POST['username']) ? trim($_POST['username']) : '';
+  $username = trim(input_text($_POST, 'username'));
   // Password is not trimmed: spaces may be part of it
-  $password = isset($_POST['password']) && is_string($_POST['password']) ? $_POST['password'] : '';
+  $password = input_text($_POST, 'password');
 
   if (!csrf_valid()) {
     $error_msg = 'Your session expired. Please try again.';
@@ -97,7 +54,7 @@ if ($locked) {
     // Input that can never be a valid account (e.g. contains quotes, spaces,
     // SQL keywords with symbols) is rejected before touching the database.
     password_verify($password, DUMMY_PASSWORD_HASH); // Keep timing consistent
-    record_failed_attempt($pdo, $client_ip, $username);
+    record_failed_login($pdo, 'admin', $client_ip, $username);
     $error_msg = 'Invalid username or password.';
   } else {
     try {
@@ -128,12 +85,12 @@ if ($locked) {
           $rehash->execute();
         }
 
-        clear_failed_attempts($pdo, $client_ip);
+        clear_failed_logins($pdo, 'admin', $client_ip);
         header('Location: dashboard.php');
         exit;
       }
 
-      record_failed_attempt($pdo, $client_ip, $username);
+      record_failed_login($pdo, 'admin', $client_ip, $username);
       $error_msg = 'Invalid username or password.';
     } catch (PDOException $e) {
       // Never show SQL details to the visitor
@@ -143,7 +100,7 @@ if ($locked) {
 
   // Show remaining attempts / lock immediately after the 5th failure
   if ($error_msg === 'Invalid username or password.') {
-    $remaining = LOGIN_MAX_ATTEMPTS - recent_failed_attempts($pdo, $client_ip);
+    $remaining = LOGIN_MAX_ATTEMPTS - recent_failed_logins($pdo, 'admin', $client_ip);
     if ($remaining <= 0) {
       $locked = true;
       $error_msg = 'Too many failed login attempts. Please wait ' . LOGIN_WINDOW_MINUTES . ' minutes and try again.';
@@ -173,10 +130,11 @@ if ($locked) {
     crossorigin="anonymous" referrerpolicy="no-referrer" />
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="<?php echo asset_url('assets/css/style.css', '../'); ?>">
 </head>
 
 <body class="login-body">
+  <?php require __DIR__ . '/../includes/page_loader.php'; // Loading screen ?>
 
   <div class="login-card">
     <div class="login-header">
@@ -216,7 +174,7 @@ if ($locked) {
         </div>
 
         <div style="margin-bottom: 20px;">
-          <button type="submit" class="btn btn-primary" style="width: 100%;" <?php echo $locked ? 'disabled' : ''; ?>>
+          <button type="submit" class="btn btn-primary" style="width: 100%;" data-loading-text="Signing in..." <?php echo $locked ? 'disabled' : ''; ?>>
             <i class="fa-solid fa-right-to-bracket"></i> Sign In
           </button>
         </div>
@@ -230,6 +188,8 @@ if ($locked) {
     </div>
   </div>
 
+  <!-- Loading screen + button spinners -->
+  <script src="<?php echo asset_url('assets/js/main.js', '../'); ?>"></script>
 </body>
 
 </html>

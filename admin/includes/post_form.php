@@ -15,6 +15,9 @@
 $current_image = $current_image ?? null;
 $current_image_size = $current_image_size ?? [null, null];  // [width, height] of saved image
 $image_ratio = $image_ratio ?? 'auto';                      // Saved / submitted display ratio
+$allow_image_download = !empty($allow_image_download);       // Show "Download Image" button
+$existing_attachments = $existing_attachments ?? [];        // (edit only) documents already attached
+$remove_attachment_ids = $remove_attachment_ids ?? [];      // Documents ticked for removal
 $field_errors = $field_errors ?? [];
 
 /** Print the inline error for one field, if any. */
@@ -24,7 +27,7 @@ $field_error = function (string $field) use ($field_errors): string {
     : '';
 };
 ?>
-<form action="<?php echo sanitize($form_action); ?>" method="POST" enctype="multipart/form-data" id="post-form"
+<form action="<?php echo sanitize($form_action); ?>" method="POST" enctype="multipart/form-data" id="post-form" data-upload-form
   novalidate>
   <?php echo csrf_field(); ?>
 
@@ -139,6 +142,67 @@ $field_error = function (string $field) use ($field_errors): string {
     <?php echo $field_error('image_ratio'); ?>
   </fieldset>
 
+  <!-- Allow visitors to download the image -->
+  <div class="form-group">
+    <label class="check-option">
+      <input type="checkbox" name="allow_image_download" value="1" <?php echo $allow_image_download ? 'checked' : ''; ?>>
+      <span>
+        <strong>Allow visitors to download this image</strong>
+        <span class="text-muted">Shows a "Download Image" button under the image on the post page.</span>
+      </span>
+    </label>
+  </div>
+
+  <!-- Documents (PDF, Word, PowerPoint) -->
+  <fieldset class="form-group documents-group">
+    <legend class="form-label"><i class="fa-solid fa-paperclip"></i> Documents for students</legend>
+    <p class="text-muted ratio-help">
+      Attach PDF, Word (DOC, DOCX) or PowerPoint (PPT, PPTX) files. Visitors can view them in the browser
+      or download them. Up to <?php echo MAX_ATTACHMENTS_PER_POST; ?> files per post,
+      <?php echo format_bytes(MAX_DOCUMENT_BYTES); ?> each, and <?php echo format_bytes(ini_bytes('post_max_size')); ?>
+      in total per save.
+    </p>
+
+    <?php if ($existing_attachments): ?>
+      <ul class="attachments-list attachments-list-admin">
+        <?php foreach ($existing_attachments as $doc): ?>
+          <li class="attachment-item">
+            <span class="attachment-icon is-<?php echo sanitize($doc['file_type']); ?>">
+              <i class="fa-solid <?php echo document_icon($doc['file_type']); ?>"></i>
+            </span>
+            <div class="attachment-info">
+              <a class="attachment-name" href="../view.php?id=<?php echo (int) $doc['id']; ?>" target="_blank">
+                <?php echo sanitize($doc['original_name']); ?>
+              </a>
+              <span class="attachment-meta">
+                <?php echo sanitize(document_label($doc['file_type'])); ?> &bull;
+                <?php echo format_bytes((int) $doc['file_size']); ?> &bull;
+                <?php echo (int) $doc['download_count']; ?> downloads
+              </span>
+            </div>
+            <label class="remove-toggle">
+              <input type="checkbox" name="remove_attachments[]" value="<?php echo (int) $doc['id']; ?>"
+                <?php echo in_array((int) $doc['id'], $remove_attachment_ids, true) ? 'checked' : ''; ?>>
+              <i class="fa-solid fa-trash-can"></i> Remove
+            </label>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+
+    <label for="documents-upload" class="file-drop" id="documents-drop">
+      <i class="fa-solid fa-cloud-arrow-up"></i>
+      <span><strong>Choose documents</strong> or drag them here</span>
+      <span class="text-muted">PDF, DOC, DOCX, PPT, PPTX</span>
+    </label>
+    <input type="file" name="documents[]" id="documents-upload" class="visually-hidden" multiple
+      accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      data-max-files="<?php echo MAX_ATTACHMENTS_PER_POST - count($existing_attachments); ?>"
+      data-max-bytes="<?php echo MAX_DOCUMENT_BYTES; ?>">
+    <ul class="selected-files" id="selected-files" aria-live="polite"></ul>
+    <?php echo $field_error('documents'); ?>
+  </fieldset>
+
   <!-- Excerpt -->
   <div class="form-group">
     <label for="excerpt" class="form-label">Excerpt (short summary) <span class="required-mark">*</span></label>
@@ -170,9 +234,9 @@ $field_error = function (string $field) use ($field_errors): string {
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">
+    <button type="submit" class="btn btn-primary" data-loading-text="Saving...">
       <i class="fa-solid <?php echo $submit_icon; ?>"></i> <?php echo sanitize($submit_label); ?>
     </button>
-    <a href="dashboard.php" class="btn btn-outline">Cancel</a>
+    <a href="posts.php" class="btn btn-outline">Cancel</a>
   </div>
 </form>

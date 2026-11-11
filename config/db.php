@@ -41,3 +41,9 @@ try {
 
 // Shared helper functions (categories, rendering, uploads, CSRF).
 require_once __DIR__ . '/../includes/functions.php';
+
+// Document attachments: upload checks, previews (PDF, Word, PowerPoint).
+require_once __DIR__ . '/../includes/documents.php';
+
+// User accounts, user uploads, activity tracking, pagination helpers.
+require_once __DIR__ . '/../includes/users.php';

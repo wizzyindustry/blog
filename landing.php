@@ -20,7 +20,8 @@ $categories = get_categories();
 
 // The 3 newest posts
 $latest_posts = $pdo->query(
-  'SELECT id, title, slug, category, excerpt, image, image_ratio, image_width, image_height, author, created_at
+  'SELECT id, title, slug, category, excerpt, image, image_ratio, image_width, image_height, author, created_at,
+          (SELECT COUNT(*) FROM attachments a WHERE a.post_id = posts.id) AS attachment_count
    FROM posts ORDER BY created_at DESC, id DESC LIMIT 3'
 )->fetchAll();
 

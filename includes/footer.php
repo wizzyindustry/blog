@@ -25,6 +25,8 @@
         <ul class="footer-links">
           <li><a href="landing.php"><i class="fa-solid fa-chevron-right"></i> Home</a></li>
           <li><a href="index.php"><i class="fa-solid fa-chevron-right"></i> All Materials</a></li>
+          <li><a href="shared.php"><i class="fa-solid fa-chevron-right"></i> Shared by Students</a></li>
+          <li><a href="account/upload.php"><i class="fa-solid fa-chevron-right"></i> Share a File</a></li>
           <li><a href="landing.php#how-it-works"><i class="fa-solid fa-chevron-right"></i> How It Works</a></li>
         </ul>
       </div>
@@ -50,15 +52,15 @@
       <div>
         &copy; <?php echo date('Y'); ?> UDOM Student Materials. All rights reserved.
       </div>
-      <div>
+      <!-- <div>
         Built with HTML5, CSS3, Vanilla JS, PHP &amp; MySQL.
-      </div>
+      </div> -->
     </div>
   </div>
 </footer>
 
 <!-- Main Vanilla JavaScript -->
-<script src="assets/js/main.js"></script>
+<script src="<?php echo asset_url('assets/js/main.js'); ?>"></script>
 </body>
 
 </html>

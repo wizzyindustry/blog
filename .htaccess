@@ -8,3 +8,4 @@ Options -Indexes
 # Block direct web access to internal folders and files
 RedirectMatch 404 ^/[^/]+/(config|includes|sql)/
 RedirectMatch 404 /\.(git|env)
+RedirectMatch 404 ^/[^/]+/(admin|account)/includes/

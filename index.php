@@ -8,8 +8,8 @@
 require_once __DIR__ . '/config/db.php';
 
 // Read and validate the current filters from the URL
-$search = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
-$category = normalize_category($_GET['category'] ?? '');
+$search = mb_substr(trim(input_text($_GET, 'q')), 0, 100);
+$category = normalize_category(input_text($_GET, 'category'));
 $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
 
 // Fetch the requested page of posts
@@ -18,6 +18,13 @@ $posts = $result['posts'];
 $total_posts = $result['total'];
 $page = $result['page'];
 $total_pages = $result['total_pages'];
+
+// Files students shared publicly, filtered by the same search and category
+try {
+  $shared = get_shared_files_page($pdo, $search, $category, 'any', 1, 8);
+} catch (PDOException $e) {
+  $shared = ['files' => [], 'total' => 0]; // Sharing tables not installed yet
+}
 
 // Total for the "All" button (each category row already has its own post_count)
 $all_total = (int) $pdo->query('SELECT COUNT(*) FROM posts')->fetchColumn();
@@ -101,6 +108,34 @@ require_once __DIR__ . '/includes/header.php';
     <div id="pagination-wrapper">
       <?php echo render_pagination($page, $total_pages, $search, $category); ?>
     </div>
+
+    <!-- Files shared by students (public uploads). Updated by live search too. -->
+    <section class="shared-section" aria-labelledby="shared-heading">
+      <div class="section-header">
+        <h2 class="section-title" id="shared-heading">
+          <i class="fa-solid fa-share-nodes"></i> Shared by Students
+          <span class="section-count" id="shared-count"><?php echo number_format($shared['total']); ?></span>
+        </h2>
+        <div class="section-actions">
+          <a href="account/upload.php" class="btn btn-outline btn-sm"><i class="fa-solid fa-cloud-arrow-up"></i> Share a file</a>
+          <a href="<?php echo sanitize('shared.php' . query_with(['page' => null])); ?>" class="btn btn-primary btn-sm" id="shared-all-link">
+            View all <i class="fa-solid fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+
+      <nav class="type-chips" aria-label="Shared file types">
+        <?php foreach (UPLOAD_TYPES as $key => [$label, $icon]): ?>
+          <a href="shared.php?type=<?php echo $key; ?><?php echo $category !== '' ? '&amp;category=' . rawurlencode($category) : ''; ?>" class="type-chip type-<?php echo $key; ?>">
+            <i class="fa-solid <?php echo $icon; ?>"></i> <?php echo $key === 'any' ? 'All files' : $label; ?>
+          </a>
+        <?php endforeach; ?>
+      </nav>
+
+      <div class="shared-grid" id="shared-grid">
+        <?php echo render_shared_grid($shared['files'], $search !== '' || $category !== '' ? 'No shared files match your search or category.' : 'No student has shared a file yet. Be the first!'); ?>
+      </div>
+    </section>
   </div>
 </main>
 

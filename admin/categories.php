@@ -41,7 +41,7 @@ function load_category(int $id): ?array
  * Handle form submissions
  * ---------------------------------------------------------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $action = (string) ($_POST['action'] ?? '');
+  $action = input_text($_POST, 'action');
   $id = (int) ($_POST['id'] ?? 0);
 
   if (!csrf_valid()) {
@@ -248,7 +248,7 @@ require_once __DIR__ . '/includes/admin_header.php';
 
             <div class="form-actions">
               <?php if ($count === 0 || !empty($others)): ?>
-                <button type="submit" class="btn btn-danger">
+                <button type="submit" class="btn btn-danger" data-loading-text="Deleting...">
                   <i class="fa-solid fa-trash-can"></i> Delete Category
                 </button>
               <?php endif; ?>
@@ -312,7 +312,7 @@ require_once __DIR__ . '/includes/admin_header.php';
             </fieldset>
 
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary">
+              <button type="submit" class="btn btn-primary" data-loading-text="Saving...">
                 <?php if ($edit_cat): ?>
                   <i class="fa-solid fa-floppy-disk"></i> Save Changes
                 <?php else: ?>

@@ -28,9 +28,9 @@ $author_name = '';
 $comment_body = '';
 
 // Handle Comment Submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_comment') {
-  $author_name = trim((string) ($_POST['name'] ?? ''));
-  $comment_body = trim((string) ($_POST['comment'] ?? ''));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && input_text($_POST, 'action') === 'add_comment') {
+  $author_name = trim(input_text($_POST, 'name'));
+  $comment_body = trim(input_text($_POST, 'comment'));
 
   if ($author_name === '' || $comment_body === '') {
     $comment_error = 'Please enter both your name and your comment.';
@@ -67,6 +67,9 @@ $comment_stmt->execute([':id' => $post_id]);
 $comments = $comment_stmt->fetchAll();
 $total_comments = count($comments);
 
+// Documents attached to this post (PDF, Word, PowerPoint)
+$attachments = get_post_attachments($pdo, $post_id);
+
 // Prepare share URL and titles
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
 $current_url = $protocol . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
@@ -102,6 +105,10 @@ require_once __DIR__ . '/includes/header.php';
           <span><i class="fa-regular fa-calendar"></i>
             <?php echo date('F d, Y', strtotime($post['created_at'])); ?></span>
           <span><i class="fa-solid fa-comments"></i> <?php echo $total_comments; ?> Comments</span>
+          <?php if ($attachments): ?>
+            <a href="#attachments"><i class="fa-solid fa-paperclip"></i> <?php echo count($attachments); ?>
+              document<?php echo count($attachments) === 1 ? '' : 's'; ?></a>
+          <?php endif; ?>
         </div>
       </header>
 
@@ -113,10 +120,56 @@ require_once __DIR__ . '/includes/header.php';
           onerror="this.onerror=null;this.src='uploads/<?php echo DEFAULT_POST_IMAGE; ?>';">
       </div>
 
+      <?php if ((int) $post['allow_image_download'] === 1): ?>
+        <!-- Shown only when the admin allowed downloading this image -->
+        <div class="image-download-bar">
+          <a href="download.php?image=<?php echo $post_id; ?>" class="btn btn-outline btn-sm">
+            <i class="fa-solid fa-download"></i> Download Image
+          </a>
+        </div>
+      <?php endif; ?>
+
       <!-- Post Content: formatting tags allowed, scripts and event handlers removed -->
       <div class="post-detail-content">
         <?php echo clean_post_html($post['content']); ?>
       </div>
+
+      <?php if ($attachments): ?>
+        <!-- Attached documents: view in the browser first, or download -->
+        <section class="attachments-section" id="attachments">
+          <h2 class="attachments-title">
+            <i class="fa-solid fa-paperclip"></i> Documents
+            <span class="comments-count-badge"><?php echo count($attachments); ?></span>
+          </h2>
+          <ul class="attachments-list">
+            <?php foreach ($attachments as $doc): ?>
+              <li class="attachment-item">
+                <span class="attachment-icon is-<?php echo sanitize($doc['file_type']); ?>">
+                  <i class="fa-solid <?php echo document_icon($doc['file_type']); ?>"></i>
+                </span>
+                <div class="attachment-info">
+                  <span class="attachment-name"><?php echo sanitize($doc['original_name']); ?></span>
+                  <span class="attachment-meta">
+                    <?php echo sanitize(document_label($doc['file_type'])); ?>
+                    &bull; <?php echo format_bytes((int) $doc['file_size']); ?>
+                    &bull; <?php echo (int) $doc['download_count']; ?>
+                    download<?php echo (int) $doc['download_count'] === 1 ? '' : 's'; ?>
+                  </span>
+                </div>
+                <div class="attachment-actions">
+                  <a href="view.php?id=<?php echo (int) $doc['id']; ?>" class="btn btn-outline btn-sm"
+                    title="<?php echo document_previewable($doc['file_type']) ? 'Read it in your browser' : 'Preview not available for this format'; ?>">
+                    <i class="fa-solid fa-eye"></i> View
+                  </a>
+                  <a href="download.php?file=<?php echo (int) $doc['id']; ?>" class="btn btn-primary btn-sm">
+                    <i class="fa-solid fa-download"></i> Download
+                  </a>
+                </div>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        </section>
+      <?php endif; ?>
 
       <!-- Share Material Section -->
       <section class="post-share-section">
@@ -194,7 +247,7 @@ require_once __DIR__ . '/includes/header.php';
               minlength="3" maxlength="2000"><?php echo sanitize($comment_body); ?></textarea>
           </div>
 
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" data-loading-text="Posting...">
             <i class="fa-solid fa-paper-plane"></i> Submit Comment
           </button>
         </form>

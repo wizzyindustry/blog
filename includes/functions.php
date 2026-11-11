@@ -72,6 +72,35 @@ const FALLBACK_IMAGE_RATIO = 16 / 9;
  * ------------------------------------------------------------ */
 
 /**
+ * Read a text field from $_GET or $_POST safely.
+ * Returns $default when the field is missing or is not plain text
+ * (e.g. a bot sending "?q[]=x" makes PHP create an array, which would
+ * otherwise cause warnings or a crash).
+ *
+ * Example: $search = input_text($_GET, 'q');
+ */
+function input_text(array $source, string $key, string $default = ''): string
+{
+    $value = $source[$key] ?? $default;
+    return is_string($value) ? $value : $default;
+}
+
+/**
+ * URL of a CSS/JS file with a version number based on when it last changed,
+ * e.g. "assets/css/style.css?v=1794301037". Browsers then download the new
+ * file as soon as it is updated, instead of using an old cached copy.
+ *
+ * $path   Path from the project root, e.g. 'assets/css/style.css'
+ * $prefix '../' when called from the admin folder
+ */
+function asset_url(string $path, string $prefix = ''): string
+{
+    $file = __DIR__ . '/../' . $path;
+    $version = is_file($file) ? filemtime($file) : time();
+    return $prefix . $path . '?v=' . $version;
+}
+
+/**
  * Escape a value for safe output inside HTML (prevents XSS).
  */
 if (!function_exists('sanitize')) {
@@ -194,9 +223,9 @@ function validate_category_input(PDO $pdo, int $exclude_id = 0): array
 {
     $data = [
         // Collapse repeated spaces: "UDOM   News" -> "UDOM News"
-        'name' => preg_replace('/\s+/u', ' ', trim((string) ($_POST['name'] ?? ''))),
-        'description' => trim((string) ($_POST['description'] ?? '')),
-        'icon' => (string) ($_POST['icon'] ?? 'fa-folder'),
+        'name' => preg_replace('/\s+/u', ' ', trim(input_text($_POST, 'name'))),
+        'description' => trim(input_text($_POST, 'description')),
+        'icon' => input_text($_POST, 'icon', 'fa-folder'),
     ];
     $errors = [];
 
@@ -347,7 +376,9 @@ function get_posts_page(PDO $pdo, string $search, string $category, int $page, i
     $offset = ($page - 1) * $per_page;
 
     $stmt = $pdo->prepare(
-        'SELECT id, title, slug, category, excerpt, image, image_ratio, image_width, image_height, author, created_at FROM posts'
+        'SELECT id, title, slug, category, excerpt, image, image_ratio, image_width, image_height, author, created_at,
+                (SELECT COUNT(*) FROM attachments a WHERE a.post_id = posts.id) AS attachment_count
+         FROM posts'
         . $where_sql . ' ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset'
     );
     foreach ($params as $key => $value) {
@@ -392,7 +423,11 @@ function render_post_card(array $post): string
           <p class="post-card-excerpt">' . sanitize($post['excerpt']) . '</p>
           <div class="post-card-meta">
             <span class="post-meta-item"><i class="fa-regular fa-calendar"></i> ' . $date . '</span>
-            <span class="post-meta-item"><i class="fa-solid fa-user"></i> ' . $author . '</span>
+            <span class="post-meta-item"><i class="fa-solid fa-user"></i> ' . $author . '</span>'
+            . (!empty($post['attachment_count'])
+                ? '<span class="post-meta-item"><i class="fa-solid fa-paperclip"></i> ' . (int) $post['attachment_count']
+                  . ' doc' . ((int) $post['attachment_count'] === 1 ? '' : 's') . '</span>'
+                : '') . '
           </div>
           <div class="post-card-footer">
             <a href="post.php?id=' . $id . '" class="btn btn-primary btn-sm">
@@ -457,7 +492,12 @@ function render_pagination(int $page, int $total_pages, string $search, string $
         $html .= '<span class="page-link disabled"><i class="fa-solid fa-chevron-left"></i></span>';
     }
 
-    for ($p = 1; $p <= $total_pages; $p++) {
+    // Windowed: first, last and two pages either side (stays short with thousands of posts)
+    foreach (page_window($page, $total_pages) as $p) {
+        if ($p === 0) {
+            $html .= '<span class="page-link disabled">&hellip;</span>';
+            continue;
+        }
         $active = $p === $page ? ' active' : '';
         $html .= '<a href="' . sanitize(home_url($search, $category, $p)) . '" data-page="' . $p
             . '" class="page-link' . $active . '"' . ($active ? ' aria-current="page"' : '') . '>' . $p . '</a>';
@@ -505,12 +545,13 @@ function render_results_summary(int $total, string $search, string $category): s
 function validate_post_input(): array
 {
     $data = [
-        'title' => trim((string) ($_POST['title'] ?? '')),
-        'category' => normalize_category($_POST['category'] ?? ''),
-        'author' => trim((string) ($_POST['author'] ?? '')),
-        'excerpt' => trim((string) ($_POST['excerpt'] ?? '')),
-        'content' => trim((string) ($_POST['content'] ?? '')),
-        'image_ratio' => (string) ($_POST['image_ratio'] ?? 'auto'),
+        'title' => trim(input_text($_POST, 'title')),
+        'category' => normalize_category(input_text($_POST, 'category')),
+        'author' => trim(input_text($_POST, 'author')),
+        'excerpt' => trim(input_text($_POST, 'excerpt')),
+        'content' => trim(input_text($_POST, 'content')),
+        'image_ratio' => input_text($_POST, 'image_ratio', 'auto'),
+        'allow_image_download' => isset($_POST['allow_image_download']) ? 1 : 0,
     ];
     $errors = [];
 
