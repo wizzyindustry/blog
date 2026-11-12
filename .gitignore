@@ -1,0 +1,24 @@
+# Secrets (database password etc.) - copy config/secrets.example.php instead
+config/secrets.php
+.env
+.env.*
+
+# Files uploaded by users and admins are private data, never source code
+uploads/user_files/*
+!uploads/user_files/.htaccess
+uploads/avatars/*
+uploads/documents/*
+!uploads/documents/.htaccess
+uploads/post_*
+
+# Logs
+logs/*
+!logs/.htaccess
+*.log
+
+# OS / editor files
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+!uploads/avatars/.htaccess
