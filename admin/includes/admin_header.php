@@ -41,14 +41,11 @@ $admin_nav = [
   <meta name="robots" content="noindex, nofollow">
   <title><?php echo htmlspecialchars($admin_page_title, ENT_QUOTES, 'UTF-8'); ?></title>
 
-  <!-- Inter Font -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?php echo render_head_meta(['description' => 'Administration panel.', 'noindex' => true], '../'); ?>
 
   <!-- Font Awesome 6 (icons only, no emojis) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
     crossorigin="anonymous" referrerpolicy="no-referrer" />
 
   <!-- Main Stylesheet -->
@@ -94,9 +91,16 @@ $admin_nav = [
       </nav>
 
       <div class="sidebar-footer">
-        <a href="logout.php" class="sidebar-link sidebar-logout">
-          <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+        <a href="password.php" class="sidebar-link<?php echo $current_page === 'password.php' ? ' active' : ''; ?>">
+          <i class="fa-solid fa-key"></i><span>Change Password</span>
         </a>
+        <!-- POST + CSRF: another website cannot sign the admin out -->
+        <form action="logout.php" method="POST">
+          <?php echo csrf_field(); ?>
+          <button type="submit" class="sidebar-link sidebar-logout">
+            <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+          </button>
+        </form>
       </div>
     </aside>
     <div class="sidebar-backdrop" data-sidebar-close></div>
@@ -129,7 +133,11 @@ $admin_nav = [
               <a href="users.php" role="menuitem"><i class="fa-solid fa-users"></i> Manage Users</a>
               <a href="posts.php" role="menuitem"><i class="fa-solid fa-newspaper"></i> Manage Posts</a>
               <a href="../index.php" target="_blank" rel="noopener" role="menuitem"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Site</a>
-              <a href="logout.php" role="menuitem" class="profile-dropdown-danger"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+              <a href="password.php" role="menuitem"><i class="fa-solid fa-key"></i> Change Password</a>
+              <form action="logout.php" method="POST" class="profile-dropdown-logout">
+                <?php echo csrf_field(); ?>
+                <button type="submit" role="menuitem"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+              </form>
             </div>
           </div>
         </div>

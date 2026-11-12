@@ -17,7 +17,7 @@
  * Settings
  * ------------------------------------------------------------ */
 
-const USER_MAX_FILE_BYTES = 100 * 1024 * 1024;   // Per file (also capped by php.ini, see user_max_file_bytes())
+const USER_MAX_FILE_BYTES = 50 * 1024 * 1024;    // Per file (also capped by php.ini, see user_max_file_bytes())
 const USER_STORAGE_QUOTA = 1024 * 1024 * 1024;   // 1 GB per user
 const USER_MAX_FILES_PER_UPLOAD = 10;
 const USER_MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -49,18 +49,31 @@ const FILE_KIND_EXTENSIONS = [
 ];
 
 // What the user says they are uploading. Restricts the file picker (accept) and is checked
-// again on the server. key => [label, icon, allowed extensions (null = anything)]
+// again on the server, together with the file's real contents (upload_content_problem()).
+// This is an ALLOW-LIST: any extension not listed here is refused.
+// key => [label, icon, allowed extensions]. 'any' is only used as the "All types" FILTER on
+// public pages; it can never be chosen for an upload.
 const UPLOAD_TYPES = [
-    'any' => ['Any file', 'fa-file', null],
+    'any' => ['All types', 'fa-file', null],
     'pdf' => ['PDF', 'fa-file-pdf', ['pdf']],
     'word' => ['Word', 'fa-file-word', ['doc', 'docx', 'odt', 'rtf']],
-    'powerpoint' => ['PowerPoint', 'fa-file-powerpoint', ['ppt', 'pptx', 'odp', 'pps', 'ppsx']],
+    'powerpoint' => ['PowerPoint', 'fa-file-powerpoint', ['ppt', 'pptx', 'odp', 'ppsx']],
     'excel' => ['Excel', 'fa-file-excel', ['xls', 'xlsx', 'ods', 'csv']],
-    'image' => ['Images', 'fa-file-image', ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif', 'avif', 'tif', 'tiff']],
-    'video' => ['Videos', 'fa-file-video', ['mp4', 'webm', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'm4v', '3gp', 'mpeg', 'mpg']],
-    'audio' => ['Audio', 'fa-file-audio', ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'wma', 'opus', 'amr']],
-    'archive' => ['ZIP / Archives', 'fa-file-zipper', ['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'bz2', 'xz']],
+    'image' => ['Images', 'fa-file-image', ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'avif']],
+    'video' => ['Videos', 'fa-file-video', ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', '3gp', 'mpeg', 'mpg']],
+    'audio' => ['Audio', 'fa-file-audio', ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'opus']],
+    'archive' => ['ZIP / Archives', 'fa-file-zipper', ['zip', 'rar', '7z']],
     'text' => ['Notes / Text', 'fa-file-lines', ['txt', 'md']],
+];
+
+// Detected content types that are refused whatever the file is called (programs, scripts, web pages)
+const BLOCKED_MIME_TYPES = [
+    'application/x-dosexec', 'application/x-msdownload', 'application/x-executable', 'application/x-sharedlib',
+    'application/x-mach-binary', 'application/x-elf', 'application/vnd.microsoft.portable-executable',
+    'application/x-msi', 'application/x-ms-installer', 'application/java-archive', 'application/x-java-applet',
+    'text/x-php', 'application/x-php', 'application/x-httpd-php', 'text/x-shellscript', 'application/x-sh',
+    'text/html', 'application/xhtml+xml', 'image/svg+xml', 'text/javascript', 'application/javascript',
+    'text/x-python', 'text/x-perl', 'application/x-bat', 'text/x-msdos-batch',
 ];
 
 const SHARED_FILES_PER_PAGE = 12;
@@ -218,6 +231,22 @@ function record_failed_login(PDO $pdo, string $scope, string $ip, string $userna
     } catch (PDOException $e) {
         // Ignore
     }
+    // Also count the failure against the ACCOUNT, so attackers rotating IP addresses are stopped too
+    if ($username !== '') {
+        rate_hit($scope . 'acct', account_key($username));
+    }
+}
+
+/** Short, non-reversible key for an account name (stored instead of the name itself). */
+function account_key(string $username): string
+{
+    return 'n:' . substr(hash('sha256', mb_strtolower(trim($username))), 0, 40);
+}
+
+/** True when an account had 10+ failed logins in the lock window (from any IP). */
+function account_login_locked(string $scope, string $username): bool
+{
+    return $username !== '' && rate_limited($scope . 'acct', account_key($username), 10, LOGIN_LOCK_MINUTES);
 }
 
 /** Clear this IP's failures after a successful login and prune rows older than a day. */
@@ -476,7 +505,11 @@ function handle_user_file_uploads(PDO $pdo, array $user, string $field, array $o
         return 0;
     }
 
-    $type = isset(UPLOAD_TYPES[$options['type'] ?? 'any']) ? ($options['type'] ?? 'any') : 'any';
+    $type = (string) ($options['type'] ?? '');
+    if ($type === 'any' || !isset(UPLOAD_TYPES[$type])) {
+        $errors[] = 'Please choose what you are uploading (PDF, Word, PowerPoint, Images...).';
+        return 0;
+    }
     $allowed_exts = UPLOAD_TYPES[$type][2];
     $chosen = count(array_filter($_FILES[$field]['error'], fn($e) => $e !== UPLOAD_ERR_NO_FILE));
     $title = $chosen === 1 && ($options['title'] ?? '') !== '' ? mb_substr($options['title'], 0, 200) : null;
@@ -497,9 +530,9 @@ function handle_user_file_uploads(PDO $pdo, array $user, string $field, array $o
     $added_bytes = 0;
 
     $insert = $pdo->prepare(
-        'INSERT INTO user_files (user_id, original_name, title, file_name, extension, mime_type, file_kind, file_size, width, height,
-                                 description, visibility, category)
-         VALUES (:uid, :original, :title, :stored, :ext, :mime, :kind, :size, :w, :h, :descr, :vis, :cat)'
+        'INSERT INTO user_files (user_id, original_name, title, file_name, extension, mime_type, file_kind, file_size,
+                                 stored_size, is_compressed, width, height, description, visibility, category)
+         VALUES (:uid, :original, :title, :stored, :ext, :mime, :kind, :size, :stored_size, :gz, :w, :h, :descr, :vis, :cat)'
     );
 
     $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : null;
@@ -541,13 +574,20 @@ function handle_user_file_uploads(PDO $pdo, array $user, string $field, array $o
 
         $ext = strtolower(pathinfo($original, PATHINFO_EXTENSION));
         $ext = preg_match('/^[a-z0-9]{1,15}$/', $ext) ? $ext : '';
-        if ($allowed_exts !== null && !in_array($ext, $allowed_exts, true)) {
+        if (!in_array($ext, $allowed_exts, true)) {
             $errors[] = $label . ' is not a ' . UPLOAD_TYPES[$type][0] . ' file. Allowed: '
-                . strtoupper(implode(', ', $allowed_exts)) . '. Choose "Any file" to upload other types.';
+                . strtoupper(implode(', ', $allowed_exts)) . '.';
             continue;
         }
         $kind = file_kind_for($ext);
         $mime = $finfo ? (string) finfo_file($finfo, $f['tmp_name'][$i]) : 'application/octet-stream';
+
+        // The CONTENTS must match the extension (a renamed program or script is refused)
+        $problem = upload_content_problem($f['tmp_name'][$i], $ext, $mime);
+        if ($problem !== null) {
+            $errors[] = $label . ' ' . $problem . '.';
+            continue;
+        }
 
         // Images: read real pixel size; a file claiming to be an image that is not one is stored as "other"
         $width = $height = null;
@@ -567,6 +607,14 @@ function handle_user_file_uploads(PDO $pdo, array $user, string $field, array $o
             continue;
         }
 
+        // Compress on the server: re-encode images (when GD is available), gzip compressible documents
+        $result = compress_stored_file($dir . $stored, $ext);
+        $size = $result['size'];             // Size the user downloads
+        $stored_size = $result['stored_size']; // Size on disk (counts toward the storage quota)
+        if ($result['width']) {
+            [$width, $height] = [$result['width'], $result['height']];
+        }
+
         try {
             $insert->execute([
                 ':uid' => (int) $user['id'],
@@ -577,6 +625,8 @@ function handle_user_file_uploads(PDO $pdo, array $user, string $field, array $o
                 ':mime' => mb_substr($mime, 0, 150),
                 ':kind' => $kind,
                 ':size' => $size,
+                ':stored_size' => $stored_size,
+                ':gz' => $result['gzip'] ? 1 : 0,
                 ':w' => $width,
                 ':h' => $height,
                 ':descr' => $description !== '' ? mb_substr($description, 0, 300) : null,
@@ -590,7 +640,7 @@ function handle_user_file_uploads(PDO $pdo, array $user, string $field, array $o
         }
 
         $saved++;
-        $added_bytes += $size;
+        $added_bytes += $stored_size;
     }
 
     if ($saved > 0) {
@@ -599,6 +649,213 @@ function handle_user_file_uploads(PDO $pdo, array $user, string $field, array $o
     }
 
     return $saved;
+}
+
+/* --------------------------------------------------------------
+ * Compression
+ * ------------------------------------------------------------ */
+
+// Formats that shrink well with gzip (the others are already compressed: PDF, DOCX, JPG, MP4, ZIP...)
+const GZIP_EXTENSIONS = ['txt', 'md', 'csv', 'rtf', 'doc', 'xls', 'ppt', 'bmp', 'wav'];
+const IMAGE_MAX_SIDE = 2560;   // Longest side after server-side image compression
+const JPEG_QUALITY = 82;
+const WEBP_QUALITY = 80;
+
+/** True when PHP's GD extension can re-encode images on this server. */
+function gd_available(): bool
+{
+    return function_exists('imagecreatefromjpeg') && function_exists('imagejpeg');
+}
+
+/**
+ * Re-encode a JPEG / PNG / WEBP image in place: shrink it to IMAGE_MAX_SIDE and remove metadata.
+ * The new version is kept only if it is smaller. Returns [width, height] or null when unchanged.
+ */
+function compress_image_file(string $path, string $ext): ?array
+{
+    if (!gd_available() || !in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+        return null;
+    }
+    $info = @getimagesize($path);
+    if (!$info || $info[0] * $info[1] > 40000000) { // Skip absurd sizes (memory protection)
+        return null;
+    }
+    [$w, $h] = $info;
+    $src = match ($info['mime']) {
+        'image/jpeg' => @imagecreatefromjpeg($path),
+        'image/png' => @imagecreatefrompng($path),
+        'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false,
+        default => false,
+    };
+    if (!$src) {
+        return null;
+    }
+    // Respect the camera's rotation before the EXIF data is dropped
+    if ($info['mime'] === 'image/jpeg' && function_exists('exif_read_data')) {
+        $o = (int) (@exif_read_data($path)['Orientation'] ?? 1);
+        $angle = [3 => 180, 6 => -90, 8 => 90][$o] ?? 0;
+        if ($angle) {
+            $src = imagerotate($src, $angle, 0);
+            [$w, $h] = [imagesx($src), imagesy($src)];
+        }
+    }
+    $scale = min(1, IMAGE_MAX_SIDE / max($w, $h));
+    $nw = max(1, (int) round($w * $scale));
+    $nh = max(1, (int) round($h * $scale));
+    $dst = imagecreatetruecolor($nw, $nh);
+    if ($info['mime'] !== 'image/jpeg') {
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+    }
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+
+    $tmp = $path . '.tmp';
+    $ok = match ($info['mime']) {
+        'image/jpeg' => imagejpeg($dst, $tmp, JPEG_QUALITY),
+        'image/png' => imagepng($dst, $tmp, 9),
+        'image/webp' => function_exists('imagewebp') && imagewebp($dst, $tmp, WEBP_QUALITY),
+    };
+    imagedestroy($src);
+    imagedestroy($dst);
+    clearstatcache();
+    if ($ok && is_file($tmp) && filesize($tmp) > 0 && filesize($tmp) < filesize($path)) {
+        rename($tmp, $path);
+        return [$nw, $nh];
+    }
+    @unlink($tmp);
+    return null;
+}
+
+/** gzip a file in place (streamed, so large files do not fill memory). Kept only if it saves 10%+. */
+function gzip_file_in_place(string $path): bool
+{
+    $tmp = $path . '.gz';
+    $in = fopen($path, 'rb');
+    $out = gzopen($tmp, 'wb6');
+    if (!$in || !$out) {
+        return false;
+    }
+    while (!feof($in)) {
+        gzwrite($out, fread($in, 1048576));
+    }
+    fclose($in);
+    gzclose($out);
+    clearstatcache();
+    if (filesize($tmp) < filesize($path) * 0.9) {
+        rename($tmp, $path);
+        return true;
+    }
+    @unlink($tmp);
+    return false;
+}
+
+/**
+ * Compress a newly stored upload. Returns:
+ *   size        bytes the user will download (after image re-encoding)
+ *   stored_size bytes on disk
+ *   gzip        true when stored gzip-compressed (decompressed on download)
+ *   width/height new image size, or null
+ */
+function compress_stored_file(string $path, string $ext): array
+{
+    clearstatcache();
+    $result = ['size' => (int) filesize($path), 'stored_size' => (int) filesize($path), 'gzip' => false, 'width' => null, 'height' => null];
+
+    $dims = compress_image_file($path, $ext);
+    if ($dims) {
+        clearstatcache();
+        $result['size'] = $result['stored_size'] = (int) filesize($path);
+        [$result['width'], $result['height']] = $dims;
+    } elseif (in_array($ext, GZIP_EXTENSIONS, true) && gzip_file_in_place($path)) {
+        clearstatcache();
+        $result['gzip'] = true;
+        $result['stored_size'] = (int) filesize($path);
+    }
+    return $result;
+}
+
+/**
+ * Check that an uploaded file really is what its extension says.
+ * Returns a problem message ("is not a valid PDF file"), or null when the file is fine.
+ */
+function upload_content_problem(string $path, string $ext, string $mime): ?string
+{
+    if (in_array(strtolower($mime), BLOCKED_MIME_TYPES, true)) {
+        return 'looks like a program, script or web page, which cannot be uploaded';
+    }
+    $head = (string) file_get_contents($path, false, null, 0, 4096);
+    if (strncmp($head, 'MZ', 2) === 0 || strncmp($head, "\x7FELF", 4) === 0 || stripos($head, '<?php') !== false) {
+        return 'contains program code, which cannot be uploaded';
+    }
+
+    $starts = fn(string $magic, int $offset = 0) => substr($head, $offset, strlen($magic)) === $magic;
+    $is_zip = $starts("PK\x03\x04");
+    $is_ole = $starts("\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1");
+
+    switch ($ext) {
+        case 'pdf':
+            return strpos(substr($head, 0, 1024), '%PDF-') !== false ? null : 'is not a valid PDF file';
+        case 'doc':
+        case 'xls':
+        case 'ppt':
+            return $is_ole ? null : 'is not a valid ' . strtoupper($ext) . ' file';
+        case 'docx':
+        case 'pptx':
+        case 'xlsx':
+        case 'ppsx':
+            $zip = $is_zip ? zip_open_index($path) : null;
+            if (!$zip) {
+                return 'is not a valid ' . strtoupper($ext) . ' file';
+            }
+            $main = ['docx' => 'word/document.xml', 'xlsx' => 'xl/workbook.xml', 'pptx' => 'ppt/presentation.xml', 'ppsx' => 'ppt/presentation.xml'][$ext];
+            $ok = isset($zip['entries'][$main]);
+            $macros = false;
+            foreach (array_keys($zip['entries']) as $name) {
+                if (stripos($name, 'vbaProject.bin') !== false) {
+                    $macros = true;
+                }
+            }
+            fclose($zip['fh']);
+            if (!$ok) {
+                return 'is not a valid ' . strtoupper($ext) . ' file';
+            }
+            return $macros ? 'contains macros, which are not allowed' : null;
+        case 'odt':
+        case 'ods':
+        case 'odp':
+            return $is_zip && strpos($head, 'mimetypeapplication/vnd.oasis.opendocument') !== false ? null : 'is not a valid ' . strtoupper($ext) . ' file';
+        case 'rtf':
+            return $starts('{\rtf') ? null : 'is not a valid RTF file';
+        case 'txt':
+        case 'md':
+        case 'csv':
+            $sample = (string) file_get_contents($path, false, null, 0, 65536);
+            if (strpos($sample, "\0") !== false || !mb_check_encoding(substr($sample, 0, 65000), 'UTF-8') && !mb_check_encoding($sample, 'Windows-1252')) {
+                return 'is not a plain text file';
+            }
+            return preg_match('/<\s*(script|iframe|html|svg)\b/i', $sample) ? 'contains HTML or script code, which is not allowed in text files' : null;
+        case 'zip':
+            return $is_zip || $starts("PK\x05\x06") ? null : 'is not a valid ZIP file';
+        case 'rar':
+            return $starts("Rar!\x1A\x07") ? null : 'is not a valid RAR file';
+        case '7z':
+            return $starts("7z\xBC\xAF\x27\x1C") ? null : 'is not a valid 7Z file';
+    }
+
+    $kind = file_kind_for($ext);
+    if ($kind === 'image') {
+        if (in_array($ext, ['heic', 'heif', 'avif'], true)) {
+            return strpos(substr($head, 4, 8), 'ftyp') === 0 ? null : 'is not a valid image';
+        }
+        $info = @getimagesize($path);
+        return $info !== false && strpos((string) $info['mime'], 'image/') === 0 && $info['mime'] !== 'image/svg+xml'
+            ? null : 'is not a valid image';
+    }
+    if ($kind === 'video' || $kind === 'audio') {
+        // finfo recognises real media containers (MP4, WebM, MP3, WAV, Ogg...)
+        return preg_match('#^(video|audio)/#', $mime) || $mime === 'application/ogg' ? null : 'is not a valid ' . $kind . ' file';
+    }
+    return 'has a file type that is not allowed';
 }
 
 /** Delete one user file (disk + row + the owner's counters). */
@@ -613,7 +870,7 @@ function delete_user_file(PDO $pdo, array $file): void
                 'UPDATE users SET file_count = GREATEST(file_count - 1, 0),
                                   storage_used = GREATEST(CAST(storage_used AS SIGNED) - :b, 0)
                  WHERE id = :uid'
-            )->execute([':b' => (int) $file['file_size'], ':uid' => (int) $file['user_id']]);
+            )->execute([':b' => (int) ($file['stored_size'] ?? $file['file_size']), ':uid' => (int) $file['user_id']]);
         }
         $pdo->commit();
     } catch (PDOException $e) {
@@ -698,6 +955,7 @@ function handle_avatar_upload(string $field, ?string &$error): ?string
         $error = 'The profile photo could not be saved on the server.';
         return null;
     }
+    compress_image_file($dir . $name, $allowed[$info['mime']]); // Shrink + strip metadata (needs GD)
     return $name;
 }
 

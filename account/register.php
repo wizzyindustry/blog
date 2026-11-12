@@ -17,6 +17,8 @@ $data = ['full_name' => '', 'username' => '', 'email' => '', 'bio' => ''];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_valid()) {
         $errors['form'] = 'Your session expired. Please try again.';
+    } elseif (rate_limited('register', client_ip(), 5, 60)) {
+        $errors['form'] = 'Too many accounts were created from your network. Please try again in an hour.';
     } elseif (input_text($_POST, 'website') !== '') {
         // Hidden "website" field: only bots fill it in
         $errors['form'] = 'Registration failed. Please try again.';
@@ -27,22 +29,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($problem !== null) {
             $errors['password'] = $problem;
         }
-        if (empty($_POST['agree'])) {
-            $errors['agree'] = 'Please accept the terms of use.';
+        // The Terms checkbox is required: checked again here, not only in the browser
+        if (input_text($_POST, 'agree') !== '1') {
+            $errors['agree'] = 'You must accept the Terms & Conditions and Privacy Policy to create an account.';
         }
 
         if (!$errors) {
             try {
+                // Record WHEN the terms were accepted and WHICH version (proof of consent)
                 $stmt = $pdo->prepare(
-                    'INSERT INTO users (full_name, username, email, password) VALUES (:n, :u, :e, :p)'
+                    'INSERT INTO users (full_name, username, email, password, terms_accepted_at, terms_version)
+                     VALUES (:n, :u, :e, :p, NOW(), :tv)'
                 );
                 $stmt->execute([
                     ':n' => $data['full_name'],
                     ':u' => $data['username'],
                     ':e' => $data['email'],
                     ':p' => password_hash($password, PASSWORD_DEFAULT),
+                    ':tv' => LEGAL_VERSION,
                 ]);
-                log_in_user($pdo, ['id' => (int) $pdo->lastInsertId(), 'username' => $data['username']]);
+                $new_id = (int) $pdo->lastInsertId();
+                rate_hit('register', client_ip());
+                log_in_user($pdo, ['id' => $new_id, 'username' => $data['username']]);
                 flash('success', 'Welcome, ' . $data['full_name'] . '! Your account is ready.');
                 header('Location: dashboard.php');
                 exit;
@@ -119,10 +127,16 @@ require __DIR__ . '/includes/auth_head.php';
   </div>
   <p class="form-hint">At least 8 characters, with at least one letter and one number.</p>
 
-  <div class="form-group">
+  <div class="form-group terms-check<?php echo isset($errors['agree']) ? ' is-invalid' : ''; ?>">
     <label class="checkbox-label">
-      <input type="checkbox" name="agree" value="1" required <?php echo !empty($_POST['agree']) ? 'checked' : ''; ?>>
-      <span>I will only upload files I have the right to share, and I accept the terms of use.</span>
+      <input type="checkbox" name="agree" value="1" required
+        <?php echo input_text($_POST, 'agree') === '1' ? 'checked' : ''; ?>
+        <?php echo isset($errors['agree']) ? 'aria-invalid="true"' : ''; ?>>
+      <span>
+        I have read and accept the <a href="../terms.php" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+        and the <a href="../privacy.php" target="_blank" rel="noopener">Privacy Policy</a>, and I will only upload
+        files I have the right to share.
+      </span>
     </label>
     <?php echo field_error($errors, 'agree'); ?>
   </div>

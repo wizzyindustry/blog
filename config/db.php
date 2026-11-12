@@ -3,40 +3,39 @@
  * Database Configuration & PDO Connection
  * UDOM Student Materials Blog
  *
- * Default XAMPP MySQL credentials: user "root" with an empty password.
- * Change these values if your MySQL setup is different.
+ * Credentials are NOT stored here. They come from config/secrets.php (git-ignored)
+ * or environment variables - see config/secrets.example.php.
+ * The site connects as "udom_app", a MySQL account that can only read and write
+ * rows in udom_blog (no DROP, ALTER, GRANT or access to other databases).
  */
 
-$db_host = 'localhost';
-$db_name = 'udom_blog';
-$db_user = 'root';
-$db_pass = '';
-$db_charset = 'utf8mb4';
+// Security layer first: debug off, HTTPS, security headers, rate limiting, sanitizer.
+require_once __DIR__ . '/../includes/security.php';
 
 // Show dates in Tanzania local time (East Africa Time, UTC+3).
 date_default_timezone_set('Africa/Dar_es_Salaam');
 
-$dsn = "mysql:host=$db_host;dbname=$db_name;charset=$db_charset";
+$dsn = 'mysql:host=' . app_config('DB_HOST', 'localhost') . ';dbname=' . app_config('DB_NAME', 'udom_blog') . ';charset=utf8mb4';
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,       // Throw exceptions on SQL errors
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,  // Rows as associative arrays
-    PDO::ATTR_EMULATE_PREPARES => false,               // Real prepared statements
+    PDO::ATTR_EMULATE_PREPARES => false,               // Real prepared statements (no SQL injection)
+    PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,         // One statement per query
 ];
 
 try {
-    $pdo = new PDO($dsn, $db_user, $db_pass, $options);
+    $pdo = new PDO($dsn, (string) app_config('DB_USER', ''), (string) app_config('DB_PASS', ''), $options);
     // Keep MySQL timestamps (NOW(), CURRENT_TIMESTAMP) in the same time zone as PHP.
     $pdo->exec("SET time_zone = '+03:00'");
 } catch (PDOException $e) {
-    http_response_code(500);
-    die(
-        '<div style="font-family:Arial,sans-serif;max-width:640px;margin:60px auto;padding:20px;'
-        . 'border:1px solid #E5E7EB;border-radius:12px;background:#FFFFFF;color:#111111;">'
-        . '<h2 style="color:#0A1E3C;">Database connection failed</h2>'
-        . '<p>Make sure MySQL is started in the XAMPP Control Panel and that '
-        . '<strong>sql/database.sql</strong> has been imported in phpMyAdmin.</p>'
-        . '<p style="color:#666666;font-size:14px;">Details: ' . htmlspecialchars($e->getMessage()) . '</p></div>'
-    );
+    // Details go to the server log only; visitors never see hostnames, users or SQL errors.
+    $ref = strtoupper(bin2hex(random_bytes(4)));
+    error_log('[ref ' . $ref . '] Database connection failed: ' . $e->getMessage());
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, 'The site is temporarily unavailable (database). Reference ' . $ref . PHP_EOL);
+        exit(1);
+    }
+    render_error_page(503, 'The site is temporarily unavailable', 'We cannot reach the database right now. Please try again in a few minutes.', $ref);
 }
 
 // Shared helper functions (categories, rendering, uploads, CSRF).
@@ -47,3 +46,9 @@ require_once __DIR__ . '/../includes/documents.php';
 
 // User accounts, user uploads, activity tracking, pagination helpers.
 require_once __DIR__ . '/../includes/users.php';
+
+// Comments, replies and who may edit / delete them.
+require_once __DIR__ . '/../includes/comments.php';
+
+// <head> tags: meta description, social cards, favicons, consent-aware fonts.
+require_once __DIR__ . '/../includes/seo.php';

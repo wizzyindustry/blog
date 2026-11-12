@@ -28,6 +28,7 @@
           <li><a href="shared.php"><i class="fa-solid fa-chevron-right"></i> Shared by Students</a></li>
           <li><a href="account/upload.php"><i class="fa-solid fa-chevron-right"></i> Share a File</a></li>
           <li><a href="landing.php#how-it-works"><i class="fa-solid fa-chevron-right"></i> How It Works</a></li>
+          <li><a href="faq.php"><i class="fa-solid fa-chevron-right"></i> FAQ</a></li>
         </ul>
       </div>
 
@@ -52,12 +53,18 @@
       <div>
         &copy; <?php echo date('Y'); ?> UDOM Student Materials. All rights reserved.
       </div>
-      <!-- <div>
-        Built with HTML5, CSS3, Vanilla JS, PHP &amp; MySQL.
-      </div> -->
+      <nav class="footer-legal" aria-label="Legal">
+        <a href="privacy.php">Privacy Policy</a>
+        <a href="terms.php">Terms &amp; Conditions</a>
+        <a href="cookies.php">Cookie Policy</a>
+        <a href="faq.php">FAQ</a>
+        <button type="button" class="footer-link-btn" data-cookie-settings>Cookie settings</button>
+      </nav>
     </div>
   </div>
 </footer>
+
+<?php $banner_prefix = ''; require __DIR__ . '/cookie_banner.php'; ?>
 
 <!-- Main Vanilla JavaScript -->
 <script src="<?php echo asset_url('assets/js/main.js'); ?>"></script>

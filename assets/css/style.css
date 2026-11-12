@@ -254,17 +254,6 @@ p {
   background-color: var(--color-primary-light);
 }
 
-.nav-admin-btn {
-  background-color: var(--color-accent);
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.nav-admin-btn:hover {
-  background-color: var(--color-accent-hover);
-  color: var(--color-primary);
-}
-
 .mobile-menu-toggle {
   display: none;
   background: none;
@@ -978,28 +967,6 @@ textarea.form-control {
 }
 
 /* Admin Dashboard & Management */
-.admin-navbar {
-  background-color: var(--color-primary);
-  border-bottom: 3px solid var(--color-accent);
-  color: #FFFFFF;
-}
-
-.admin-header-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
-}
-
-.admin-brand {
-  font-weight: 700;
-  font-size: 18px;
-  color: #FFFFFF;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .admin-badge {
   background-color: var(--color-accent);
   color: var(--color-primary);
@@ -1373,61 +1340,13 @@ textarea.form-control {
   pointer-events: none;
 }
 
-/* Admin header: wraps cleanly on small screens */
-.admin-header-inner {
-  height: auto;
-  min-height: 64px;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.admin-brand:hover {
-  color: #FFFFFF;
-}
-
 .brand-icon-sm {
   width: 34px;
   height: 34px;
   font-size: 16px;
 }
 
-.admin-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  list-style: none;
-}
-
-.admin-nav .btn-danger,
-.admin-nav .btn-danger:hover {
-  color: #FFFFFF;
-}
-
-@media (max-width: 768px) {
-  .admin-header-inner {
-    justify-content: center;
-  }
-
-  .admin-nav {
-    justify-content: center;
-  }
-
-  .admin-nav .nav-link {
-    padding: 8px 10px;
-  }
-}
-
 @media (max-width: 480px) {
-  /* Icons only on very small phones */
-  .admin-nav .nav-link span,
-  .admin-nav .btn span,
-  .admin-brand-text {
-    display: none;
-  }
-
   .search-btn-text {
     display: none;
   }
@@ -4876,4 +4795,837 @@ a.mini-stat:hover {
 .file-preview-card .shared-thumb-icon {
   font-size: 64px;
   padding: 16px;
+}
+
+/* Sidebar logout is a POST form button styled as a link */
+.sidebar-footer form {
+  margin: 0;
+}
+
+button.sidebar-link {
+  width: 100%;
+  background: none;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ==============================================================
+   COMMENT REPLIES, EDIT / DELETE
+   ============================================================== */
+.comment-item {
+  align-items: flex-start;
+}
+
+.comment-avatar-img {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+}
+
+.comment-content {
+  min-width: 0;
+}
+
+.comment-meta {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.comment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.comment-badge-you {
+  background-color: #FBF7EA;
+  color: #7A5C0F;
+}
+
+.comment-edited {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.comment-text {
+  word-break: break-word;
+}
+
+.comment-replying-to {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.comment-deleted-text {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
+.comment-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.comment-action:hover,
+.comment-action:focus-visible {
+  color: var(--color-primary);
+}
+
+.comment-action-danger:hover,
+.comment-action-danger:focus-visible {
+  color: var(--color-danger);
+}
+
+/* Replies: indented under their comment with a gold thread line */
+.comment-replies {
+  margin-top: 12px;
+  padding-left: 18px;
+  border-left: 2px solid #EADFB8;
+}
+
+.comment-replies .comment-item {
+  padding: 14px 0;
+}
+
+.comment-replies .comment-item:last-child {
+  padding-bottom: 0;
+}
+
+.comment-replies .comment-avatar,
+.comment-replies .comment-avatar-img {
+  width: 34px;
+  height: 34px;
+  font-size: 14px;
+}
+
+/* Deepest level: no further indent (keeps long threads readable on phones) */
+.comment-replies.is-flat {
+  padding-left: 0;
+  border-left: none;
+  margin-left: -50px;
+}
+
+.comment-item.is-deleted > .comment-avatar {
+  background-color: var(--color-bg);
+  color: var(--color-muted);
+}
+
+.comment-reply-form,
+.comment-edit-form {
+  margin-top: 12px;
+  padding: 14px;
+  background-color: #F8FAFC;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.comment-edit-form textarea,
+.comment-reply-form textarea {
+  min-height: 90px;
+}
+
+.comment-reply-form .form-group:last-of-type,
+.comment-edit-form textarea {
+  margin-bottom: 10px;
+}
+
+.comment-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.comment-as {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.comment-form-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.comment-form-note {
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .comment-replies {
+    padding-left: 12px;
+  }
+
+  .comment-replies.is-flat {
+    margin-left: -46px;
+  }
+}
+
+/* Header: keep every label on one line now that it also holds Shared Files + account links */
+.brand-logo,
+.nav-link,
+.nav-account .btn {
+  white-space: nowrap;
+}
+
+@media (min-width: 769px) and (max-width: 1240px) {
+  .nav-menu {
+    gap: 4px;
+  }
+
+  .nav-link {
+    padding: 8px 9px;
+    font-size: 14px;
+  }
+
+  .brand-logo {
+    font-size: 17px;
+  }
+}
+
+/* Mid-size screens: show only the logo icon so the menu fits */
+@media (min-width: 769px) and (max-width: 1080px) {
+  .brand-logo > span:not(.brand-icon) {
+    display: none;
+  }
+}
+
+/* ==============================================================
+   ERROR SCREENS
+   ============================================================== */
+.error-body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg);
+}
+
+.error-header {
+  padding: 16px 24px;
+  background-color: var(--color-primary);
+  border-bottom: 3px solid var(--color-accent);
+}
+
+.error-header .brand-logo:hover {
+  color: #FFFFFF;
+}
+
+.error-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+.error-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 40px 32px;
+  text-align: center;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.error-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  background-color: var(--color-primary);
+  color: var(--color-accent);
+}
+
+.error-code {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--color-accent-hover);
+}
+
+.error-title {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.error-message {
+  color: var(--color-muted);
+  margin-bottom: 24px;
+}
+
+.error-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.error-search .form-control {
+  flex: 1;
+}
+
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.error-reference {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.error-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .error-card {
+    padding: 28px 20px;
+  }
+
+  .error-search {
+    flex-direction: column;
+  }
+}
+
+/* ==============================================================
+   LEGAL PAGES + FAQ
+   ============================================================== */
+.legal-hero .hero-title i {
+  color: var(--color-accent);
+  margin-right: 6px;
+}
+
+.legal-updated {
+  margin: 12px 0 0;
+  color: #CBD5E1;
+  font-size: 14px;
+}
+
+.legal-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .legal-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .legal-toc {
+    position: sticky;
+    top: 24px;
+  }
+}
+
+.legal-toc {
+  padding: 20px;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+}
+
+.legal-toc-title {
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.legal-toc ol {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.legal-toc li {
+  padding: 3px 0;
+}
+
+.legal-toc-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.legal-content {
+  min-width: 0;
+  padding: 32px;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.legal-content section {
+  scroll-margin-top: 24px;
+  padding-bottom: 8px;
+}
+
+.legal-content section + section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.legal-content h3 {
+  font-size: 16px;
+  margin-top: 16px;
+}
+
+.legal-content ul,
+.legal-content ol {
+  padding-left: 22px;
+  margin-bottom: 16px;
+}
+
+.legal-content li {
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.legal-table td,
+.legal-table th {
+  vertical-align: top;
+}
+
+@media (max-width: 640px) {
+  .legal-content {
+    padding: 20px;
+  }
+}
+
+.faq-search {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.faq-search > i {
+  position: absolute;
+  left: 16px;
+  top: 15px;
+  color: var(--color-muted);
+}
+
+.faq-search .form-control {
+  padding-left: 44px;
+}
+
+.faq-empty {
+  margin: 12px 0 0;
+}
+
+.faq-group h2 {
+  margin-bottom: 12px;
+}
+
+.faq-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  background-color: var(--color-card);
+}
+
+.faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-primary);
+  list-style: none;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary i {
+  transition: transform 0.2s ease;
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.faq-item[open] summary i {
+  transform: rotate(180deg);
+}
+
+.faq-item[open] summary {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.faq-item summary:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.faq-answer {
+  padding: 14px 18px;
+}
+
+.faq-answer p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.faq-cta {
+  margin-top: 32px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  background-color: #FBF7EA;
+  border: 1px solid #EADFB8;
+}
+
+/* ==============================================================
+   FOOTER LEGAL LINKS
+   ============================================================== */
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 13px;
+}
+
+.site-footer .footer-legal a,
+.site-footer .footer-link-btn {
+  color: #CBD5E1;
+}
+
+.site-footer .footer-legal a:hover,
+.site-footer .footer-link-btn:hover {
+  color: var(--color-accent);
+}
+
+.footer-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.app-footer .footer-legal a,
+.app-footer .footer-link-btn {
+  color: var(--color-muted);
+}
+
+.auth-legal {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.terms-check.is-invalid .checkbox-label {
+  color: var(--color-danger);
+}
+
+/* ==============================================================
+   COOKIE BANNER
+   ============================================================== */
+.cookie-banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1500;
+  max-width: 980px;
+  margin: 0 auto;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(10, 30, 60, 0.25);
+}
+
+.cookie-banner[hidden] {
+  display: none;
+}
+
+.cookie-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.cookie-banner-icon {
+  font-size: 28px;
+  color: var(--color-accent-hover);
+  flex-shrink: 0;
+}
+
+.cookie-banner-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cookie-banner h2 {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.cookie-banner p {
+  font-size: 14px;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.cookie-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .cookie-banner-inner {
+    flex-wrap: wrap;
+  }
+
+  .cookie-banner-icon {
+    display: none;
+  }
+
+  .cookie-banner-actions {
+    width: 100%;
+  }
+
+  .cookie-banner-actions .btn {
+    flex: 1;
+  }
+}
+
+/* ==============================================================
+   PASSWORD VISIBILITY TOGGLE
+   ============================================================== */
+.password-field {
+  position: relative;
+}
+
+.password-field .form-control {
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible {
+  color: var(--color-primary);
+  background-color: var(--color-bg);
+  outline: none;
+}
+
+.password-toggle:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.password-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ==============================================================
+   CONFIRMATION MODAL
+   ============================================================== */
+.confirm-modal {
+  width: calc(100% - 32px);
+  max-width: 440px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(6, 19, 38, 0.35);
+  color: var(--color-text);
+  background-color: var(--color-card);
+}
+
+.confirm-modal::backdrop {
+  background-color: rgba(6, 19, 38, 0.6);
+}
+
+.confirm-modal[open] {
+  animation: modal-in 0.15s ease-out;
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.confirm-modal-box {
+  padding: 28px 24px 22px;
+  text-align: center;
+}
+
+.confirm-modal-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.confirm-modal.is-safe .confirm-modal-icon {
+  background-color: #FBF7EA;
+  color: var(--color-accent-hover);
+}
+
+.confirm-modal h2 {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.confirm-modal p {
+  color: var(--color-muted);
+  margin-bottom: 22px;
+  word-break: break-word;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.confirm-modal-actions .btn {
+  flex: 1;
+  max-width: 180px;
+}
+
+/* ==============================================================
+   OFFLINE NOTICE + IMAGE OPTIMIZATION NOTE
+   ============================================================== */
+.offline-notice {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  background-color: var(--color-danger);
+  color: #FFFFFF;
+}
+
+.offline-notice i {
+  margin-right: 6px;
+}
+
+.compress-note {
+  margin: 8px 0 12px;
+  font-size: 13px;
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-modal[open] {
+    animation: none;
+  }
+}
+
+/* The global reset (margin: 0) removes <dialog>'s built-in centering: restore it */
+.confirm-modal {
+  margin: auto;
+  inset: 0;
+}
+
+/* Links inside checkbox labels (e.g. Terms & Privacy on sign-up) look like links */
+.checkbox-label a {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

@@ -102,7 +102,7 @@ $field_error = function (string $field) use ($field_errors): string {
       data-height="<?php echo (int) ($current_image_size[1] ?? 0); ?>">
       <?php if ($current_image): ?>
         <img id="preview-img" src="<?php echo post_image_url($current_image, '../'); ?>" alt="Current featured image"
-          onerror="this.onerror=null;this.src='../uploads/<?php echo DEFAULT_POST_IMAGE; ?>';">
+          data-fallback="../uploads/<?php echo DEFAULT_POST_IMAGE; ?>">
       <?php else: ?>
         <span id="preview-placeholder" class="text-muted"><i class="fa-regular fa-image"></i> Image preview</span>
         <img id="preview-img" src="" alt="Selected image preview" style="display: none;">

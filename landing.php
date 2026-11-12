@@ -9,6 +9,8 @@ require_once __DIR__ . '/config/db.php';
 
 $active_nav = 'landing';
 $page_title = 'Welcome';
+$meta_description = SITE_DESCRIPTION;
+$meta_canonical = 'landing.php';
 
 // Live statistics
 $total_posts = (int) $pdo->query('SELECT COUNT(*) FROM posts')->fetchColumn();

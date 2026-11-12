@@ -12,6 +12,7 @@
  */
 
 initPageLoader(); // Runs immediately (the script is at the end of <body>)
+initImageFallbacks(); // Replaces inline onerror="..." handlers (blocked by the Content-Security-Policy)
 
 document.addEventListener('DOMContentLoaded', function () {
   initButtonLoaders();
@@ -30,7 +31,350 @@ document.addEventListener('DOMContentLoaded', function () {
   initDataConfirm();
   initUploadForm();
   initDashboardCharts();
+  initAutoSubmit();
+  initComments();
+  initPasswordToggles();
+  initImageCompression();
+  initCookieBanner();
+  initOfflineNotice();
+  initFaqFilter();
 });
+
+/* ------------------------------------------------------------
+ * Password visibility toggle: an eye button inside every password field
+ * ---------------------------------------------------------- */
+function initPasswordToggles() {
+  document.querySelectorAll('input[type="password"]').forEach(function (input) {
+    if (input.dataset.toggleReady) return;
+    input.dataset.toggleReady = '1';
+    const wrap = document.createElement('div');
+    wrap.className = 'password-field';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'password-toggle';
+    btn.setAttribute('aria-label', 'Show password');
+    btn.setAttribute('aria-pressed', 'false');
+    if (input.id) btn.setAttribute('aria-controls', input.id);
+    btn.innerHTML = '<i class="fa-solid fa-eye" aria-hidden="true"></i>';
+    btn.disabled = input.disabled;
+    wrap.appendChild(btn);
+
+    btn.addEventListener('click', function () {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+      btn.innerHTML = '<i class="fa-solid ' + (show ? 'fa-eye-slash' : 'fa-eye') + '" aria-hidden="true"></i>';
+      input.focus();
+    });
+    // Never submit the form with the password visible in the field type (password managers)
+    if (input.form) {
+      input.form.addEventListener('submit', function () { input.type = 'password'; });
+    }
+  });
+}
+
+/* ------------------------------------------------------------
+ * Image compression in the browser before upload
+ * Large JPEG / PNG / WEBP images are resized (longest side) and re-encoded. This
+ * makes uploads faster, saves storage and removes hidden photo data (EXIF / GPS).
+ * Applies to: user uploads, profile photo, admin post image.
+ * ---------------------------------------------------------- */
+const COMPRESS_TARGETS = { 'files': 2560, 'avatar': 512, 'image-upload': 1920 };
+
+function compressImage(file, maxSide) {
+  return new Promise(function (resolve) {
+    const type = (file.type || '').toLowerCase();
+    if (!/^image\/(jpeg|png|webp)$/.test(type) || !window.createImageBitmap || !HTMLCanvasElement.prototype.toBlob) {
+      return resolve(file);
+    }
+    createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
+      const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+      if (scale === 1 && file.size < 300 * 1024) { // Already small: leave it alone
+        bmp.close && bmp.close();
+        return resolve(file);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bmp.width * scale));
+      canvas.height = Math.max(1, Math.round(bmp.height * scale));
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      bmp.close && bmp.close();
+
+      // JPEG stays JPEG; PNG / WEBP become WEBP (keeps transparency, much smaller)
+      const outType = type === 'image/jpeg' ? 'image/jpeg' : 'image/webp';
+      canvas.toBlob(function (blob) {
+        if (!blob || blob.type !== outType || blob.size >= file.size * 0.95) return resolve(file); // Not worth it
+        const base = file.name.replace(/\.[^.]+$/, '');
+        const name = outType === 'image/jpeg' ? (/\.jpe?g$/i.test(file.name) ? file.name : base + '.jpg') : base + '.webp';
+        resolve(new File([blob], name, { type: outType, lastModified: Date.now() }));
+      }, outType, outType === 'image/jpeg' ? 0.82 : 0.8);
+    }).catch(function () { resolve(file); });
+  });
+}
+
+function initImageCompression() {
+  Object.keys(COMPRESS_TARGETS).forEach(function (id) {
+    const input = document.getElementById(id);
+    if (!input || !window.DataTransfer) return;
+    const maxSide = COMPRESS_TARGETS[id];
+
+    let note = document.createElement('p');
+    note.className = 'compress-note';
+    note.setAttribute('aria-live', 'polite');
+    note.hidden = true;
+    (input.closest('.dropzone') || input).insertAdjacentElement('afterend', note);
+
+    input.addEventListener('change', function (e) {
+      if (input.dataset.compressing === 'done') { // Our own re-dispatch below
+        delete input.dataset.compressing;
+        return;
+      }
+      const files = Array.prototype.slice.call(input.files || []);
+      if (!files.some(function (f) { return /^image\/(jpeg|png|webp)$/i.test(f.type); })) return;
+      e.stopImmediatePropagation(); // Other handlers run after compression finishes
+      const form = input.form;
+      if (form) form.dataset.compressing = '1';
+      note.hidden = false;
+      note.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Optimizing images...';
+
+      Promise.all(files.map(function (f) { return compressImage(f, maxSide); })).then(function (out) {
+        let before = 0, after = 0;
+        const dt = new DataTransfer();
+        out.forEach(function (f, i) { before += files[i].size; after += f.size; dt.items.add(f); });
+        input.files = dt.files;
+        if (form) delete form.dataset.compressing;
+        if (after < before) {
+          note.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Images optimized: ' +
+            formatBytes(before) + ' &rarr; ' + formatBytes(after) + ' (' + Math.round((1 - after / before) * 100) + '% smaller, photo location data removed).';
+        } else {
+          note.hidden = true;
+        }
+        input.dataset.compressing = 'done';
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }, true);
+  });
+
+  // Do not submit while images are still being optimized
+  document.addEventListener('submit', function (e) {
+    if (e.target.dataset && e.target.dataset.compressing === '1') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }, true);
+}
+
+/* ------------------------------------------------------------
+ * Cookie consent banner
+ * ---------------------------------------------------------- */
+function initCookieBanner() {
+  const banner = document.getElementById('cookie-banner');
+  if (!banner) return;
+  const name = banner.dataset.cookieName || 'udom_consent';
+
+  function save(choice) {
+    document.cookie = name + '=' + choice + '; Max-Age=31536000; Path=/; SameSite=Lax' + (banner.dataset.secure === '1' ? '; Secure' : '');
+    banner.hidden = true;
+    // Load (or stop loading) Google Fonts right away, without a page reload
+    const existing = document.querySelector('link[href*="fonts.googleapis.com/css2"]');
+    if (choice === 'all' && !existing) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+      document.head.appendChild(link);
+    } else if (choice === 'essential' && existing) {
+      existing.remove();
+    }
+    const opener = document.querySelector('[data-cookie-settings]');
+    if (opener) opener.focus();
+  }
+
+  banner.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-consent]');
+    if (!btn) return;
+    e.preventDefault();
+    save(btn.getAttribute('data-consent'));
+  });
+
+  // "Cookie settings" links reopen the banner
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-cookie-settings]')) return;
+    e.preventDefault();
+    banner.hidden = false;
+    const first = banner.querySelector('[data-consent]');
+    if (first) first.focus();
+  });
+}
+
+/* ------------------------------------------------------------
+ * Offline notice: tells the visitor when the connection drops
+ * ---------------------------------------------------------- */
+function initOfflineNotice() {
+  let bar = null;
+  function update() {
+    if (navigator.onLine) {
+      if (bar) bar.hidden = true;
+      return;
+    }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'offline-notice';
+      bar.setAttribute('role', 'status');
+      bar.innerHTML = '<i class="fa-solid fa-wifi" aria-hidden="true"></i> You are offline. Check your internet connection; ' +
+        'anything you submit now will not be saved.';
+      document.body.appendChild(bar);
+    }
+    bar.hidden = false;
+  }
+  window.addEventListener('online', update);
+  window.addEventListener('offline', update);
+  update();
+}
+
+/* ------------------------------------------------------------
+ * FAQ: filter questions as you type
+ * ---------------------------------------------------------- */
+function initFaqFilter() {
+  const input = document.getElementById('faq-filter');
+  if (!input) return;
+  const empty = document.getElementById('faq-empty');
+  input.addEventListener('input', function () {
+    const q = input.value.trim().toLowerCase();
+    let shown = 0;
+    document.querySelectorAll('.faq-group').forEach(function (group) {
+      let groupShown = 0;
+      group.querySelectorAll('.faq-item').forEach(function (item) {
+        const match = q === '' || item.textContent.toLowerCase().indexOf(q) !== -1;
+        item.hidden = !match;
+        if (match) groupShown++;
+        if (q !== '' && match && q.length > 2) item.open = true;
+      });
+      group.hidden = groupShown === 0;
+      shown += groupShown;
+    });
+    if (empty) empty.hidden = shown > 0;
+  });
+}
+
+/* ------------------------------------------------------------
+ * Comments: reply to a specific comment, edit your own comment
+ * (Without JavaScript the same links reload the page with the form open.)
+ * ---------------------------------------------------------- */
+function initComments() {
+  const list = document.querySelector('.comments-list');
+  const template = document.getElementById('reply-template');
+  if (!list) return;
+
+  // Scroll back to the comment whose form had an error
+  if (list.dataset.focus) {
+    const target = document.getElementById(list.dataset.focus);
+    if (target) target.scrollIntoView({ block: 'center' });
+  }
+
+  function closeReplyForms() {
+    list.querySelectorAll('.comment-reply-form[data-js]').forEach(function (f) { f.remove(); });
+  }
+
+  list.addEventListener('click', function (e) {
+    // "Reply": open a reply form right under that comment
+    const replyBtn = e.target.closest('[data-reply-to]');
+    if (replyBtn && template) {
+      e.preventDefault();
+      const id = replyBtn.getAttribute('data-reply-to');
+      const comment = document.getElementById('comment-' + id);
+      const existing = comment.querySelector(':scope > .comment-content > .comment-reply-form');
+      closeReplyForms();
+      if (existing && existing.hasAttribute('data-js')) return; // Second click closes it
+
+      const form = template.content.firstElementChild.cloneNode(true);
+      form.setAttribute('data-js', '');
+      form.id = 'reply-' + id;
+      form.action = form.getAttribute('action') + '#comment-' + id;
+      form.querySelector('input[name="parent_id"]').value = id;
+      // Unique ids for labels
+      form.querySelectorAll('[id]').forEach(function (el) {
+        const newId = el.id.replace('reply-new', 'reply-' + id);
+        const label = form.querySelector('label[for="' + el.id + '"]');
+        if (label) label.setAttribute('for', newId);
+        el.id = newId;
+      });
+      const text = form.querySelector('textarea');
+      text.placeholder = 'Reply to ' + (replyBtn.getAttribute('data-reply-name') || 'this comment') + '...';
+
+      const actions = comment.querySelector(':scope > .comment-content > .comment-actions');
+      actions.insertAdjacentElement('afterend', form);
+      text.focus();
+      return;
+    }
+
+    if (e.target.closest('[data-reply-cancel]')) {
+      e.preventDefault();
+      closeReplyForms();
+      return;
+    }
+
+    // "Edit" (only rendered on your own comments): swap the text for the edit form
+    const editBtn = e.target.closest('[data-edit-comment]');
+    if (editBtn) {
+      e.preventDefault();
+      const content = document.getElementById('comment-' + editBtn.getAttribute('data-edit-comment'))
+        .querySelector(':scope > .comment-content');
+      content.querySelector(':scope > .comment-text').hidden = true;
+      const form = content.querySelector(':scope > .comment-edit-form');
+      form.hidden = false;
+      const area = form.querySelector('textarea');
+      area.focus();
+      area.setSelectionRange(area.value.length, area.value.length);
+      return;
+    }
+
+    const cancelEdit = e.target.closest('[data-comment-cancel]');
+    if (cancelEdit) {
+      e.preventDefault();
+      const content = cancelEdit.closest('.comment-content');
+      content.querySelector(':scope > .comment-edit-form').hidden = true;
+      content.querySelector(':scope > .comment-text').hidden = false;
+    }
+  });
+}
+
+/* ------------------------------------------------------------
+ * CSP-safe replacements for inline event handlers
+ * ---------------------------------------------------------- */
+
+/** <img data-fallback="other.svg">: show the fallback image if the real one fails to load. */
+function initImageFallbacks() {
+  function useFallback(img) {
+    const fallback = img.getAttribute('data-fallback');
+    if (fallback && img.getAttribute('src') !== fallback) {
+      img.removeAttribute('data-fallback'); // Only once (no loop if the fallback also fails)
+      img.src = fallback;
+    }
+  }
+  // Errors do not bubble, so listen in the capture phase
+  document.addEventListener('error', function (e) {
+    if (e.target && e.target.tagName === 'IMG' && e.target.hasAttribute('data-fallback')) useFallback(e.target);
+  }, true);
+  // Images that already failed before this script ran
+  document.querySelectorAll('img[data-fallback]').forEach(function (img) {
+    if (img.complete && img.naturalWidth === 0) useFallback(img);
+  });
+}
+
+/** <select data-autosubmit>: submit the filter form as soon as the choice changes. */
+function initAutoSubmit() {
+  document.addEventListener('change', function (e) {
+    const el = e.target;
+    if (el && el.hasAttribute && el.hasAttribute('data-autosubmit') && el.form) {
+      if (typeof el.form.requestSubmit === 'function') el.form.requestSubmit(); else el.form.submit();
+    }
+  });
+}
 
 /* ------------------------------------------------------------
  * 0a. Page loader
@@ -770,13 +1114,13 @@ function initFormValidation() {
  * 4e. Confirm before deleting a post
  * ---------------------------------------------------------- */
 function initDeleteConfirm() {
+  // Post delete buttons use the shared confirmation modal (see initDataConfirm)
   document.querySelectorAll('.btn-confirm-delete').forEach(function (btn) {
-    btn.addEventListener('click', function (e) {
-      const title = btn.dataset.title ? '"' + btn.dataset.title + '"' : 'this post';
-      if (!window.confirm('Delete ' + title + ' and all its comments? This cannot be undone.')) {
-        e.preventDefault();
-      }
-    });
+    if (btn.hasAttribute('data-confirm')) return;
+    const title = btn.dataset.title ? '"' + btn.dataset.title + '"' : 'this post';
+    btn.setAttribute('data-confirm', 'Delete ' + title + ' and all its comments? This cannot be undone.');
+    btn.setAttribute('data-confirm-title', 'Delete post?');
+    btn.setAttribute('data-confirm-ok', 'Delete post');
   });
 }
 
@@ -866,15 +1210,87 @@ function initDropdowns() {
   });
 }
 
-/* ---------- 5c. Confirm before destructive buttons: data-confirm="message" ---------- */
+/* ---------- 5c. Confirmation modal for destructive actions ----------
+ * <button data-confirm="Message" [data-confirm-title="..."] [data-confirm-ok="Delete"]>
+ * Opens an accessible dialog (focus moves into it, Esc / Cancel closes it, focus returns).
+ * Without JavaScript the action simply runs (the server still checks permission + CSRF).
+ */
+function confirmDialog(opts) {
+  return new Promise(function (resolve) {
+    let dialog = document.getElementById('confirm-modal');
+    if (!dialog) {
+      dialog = document.createElement('dialog');
+      dialog.id = 'confirm-modal';
+      dialog.className = 'confirm-modal';
+      dialog.setAttribute('aria-labelledby', 'confirm-modal-title');
+      dialog.setAttribute('aria-describedby', 'confirm-modal-text');
+      dialog.innerHTML =
+        '<form method="dialog" class="confirm-modal-box">' +
+        '<div class="confirm-modal-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>' +
+        '<h2 id="confirm-modal-title"></h2>' +
+        '<p id="confirm-modal-text"></p>' +
+        '<div class="confirm-modal-actions">' +
+        '<button type="submit" value="cancel" class="btn btn-outline" data-modal-cancel>Cancel</button>' +
+        '<button type="submit" value="ok" class="btn btn-danger" data-modal-ok></button>' +
+        '</div></form>';
+      document.body.appendChild(dialog);
+      // Click on the dark backdrop = cancel
+      dialog.addEventListener('click', function (e) {
+        if (e.target === dialog) dialog.close('cancel');
+      });
+    }
+    const returnFocus = document.activeElement;
+    dialog.querySelector('#confirm-modal-title').textContent = opts.title || 'Are you sure?';
+    dialog.querySelector('#confirm-modal-text').textContent = opts.message || '';
+    const ok = dialog.querySelector('[data-modal-ok]');
+    ok.textContent = opts.okText || 'Confirm';
+    ok.className = 'btn ' + (opts.danger === false ? 'btn-primary' : 'btn-danger');
+    dialog.classList.toggle('is-safe', opts.danger === false);
+
+    dialog.addEventListener('close', function onClose() {
+      dialog.removeEventListener('close', onClose);
+      if (returnFocus && returnFocus.focus) returnFocus.focus();
+      resolve(dialog.returnValue === 'ok');
+    });
+    dialog.returnValue = '';
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+      dialog.querySelector('[data-modal-cancel]').focus(); // Safe default: Cancel is focused
+    } else {
+      resolve(window.confirm(opts.message)); // Very old browsers
+    }
+  });
+}
+
 function initDataConfirm() {
   document.addEventListener('click', function (e) {
-    const btn = e.target.closest('[data-confirm]');
-    if (!btn) return;
-    if (!window.confirm(btn.getAttribute('data-confirm'))) {
-      e.preventDefault();
-      e.stopPropagation();
+    const el = e.target.closest('[data-confirm]');
+    if (!el) return;
+    if (el.dataset.confirmed === '1') { // Second, confirmed click: let it through
+      delete el.dataset.confirmed;
+      return;
     }
+    e.preventDefault();
+    e.stopPropagation();
+    const message = el.getAttribute('data-confirm');
+    const isDelete = /delete|remove|block|deactivat/i.test(message + ' ' + el.textContent);
+    confirmDialog({
+      title: el.getAttribute('data-confirm-title') || (isDelete ? 'Are you sure?' : 'Please confirm'),
+      message: message,
+      okText: el.getAttribute('data-confirm-ok') || el.textContent.trim() || el.getAttribute('title') || 'Confirm',
+      danger: isDelete
+    }).then(function (yes) {
+      if (!yes) return;
+      el.dataset.confirmed = '1';
+      if (el.form && el.type === 'submit') {
+        if (typeof el.form.requestSubmit === 'function') el.form.requestSubmit(el); else el.click();
+        delete el.dataset.confirmed;
+      } else if (el.tagName === 'A' && el.href) {
+        window.location.href = el.href;
+      } else {
+        el.click();
+      }
+    });
   }, true);
 }
 
@@ -1001,7 +1417,8 @@ function initUploadForm() {
   zone.addEventListener('drop', function (e) {
     if (e.dataTransfer && e.dataTransfer.files.length) {
       input.files = e.dataTransfer.files;
-      render();
+      // Same path as choosing files: image optimization runs first, then the list is drawn
+      input.dispatchEvent(new Event('change', { bubbles: true }));
     }
   });
 
@@ -1061,8 +1478,15 @@ function initUploadForm() {
 
 /* ---------- 5e. Admin dashboard charts (Chart.js) ---------- */
 function initDashboardCharts() {
-  const data = window.DASHBOARD_DATA;
-  if (!data || !window.Chart) return;
+  // Data comes from a non-executable JSON block (allowed by the Content-Security-Policy)
+  const dataEl = document.getElementById('dashboard-data');
+  if (!dataEl || !window.Chart) return;
+  let data;
+  try {
+    data = JSON.parse(dataEl.textContent);
+  } catch (e) {
+    return;
+  }
 
   const C = window.Chart;
   const ink = '#52514e';

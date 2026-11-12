@@ -85,7 +85,7 @@ require_once __DIR__ . '/includes/admin_header.php';
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="search" name="q" class="form-control" placeholder="Search titles" value="<?php echo sanitize($search); ?>" maxlength="100">
           </div>
-          <select name="category" class="form-control" aria-label="Category" onchange="this.form.submit()">
+          <select name="category" class="form-control" aria-label="Category" data-autosubmit>
             <option value="">All categories</option>
             <?php foreach (get_categories() as $cat): ?>
               <option value="<?php echo sanitize($cat['name']); ?>" <?php echo $category === $cat['name'] ? 'selected' : ''; ?>><?php echo sanitize($cat['name']); ?></option>
@@ -118,7 +118,7 @@ require_once __DIR__ . '/includes/admin_header.php';
                       src="<?php echo $thumb_path; ?>" 
                       alt="<?php echo sanitize($post['title']); ?>" 
                       class="table-thumb"
-                      onerror="this.onerror=null;this.src='../uploads/default-post.svg';"
+                      data-fallback="../uploads/default-post.svg"
                     >
                   </td>
                   <td>

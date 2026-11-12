@@ -90,18 +90,18 @@ require_once __DIR__ . '/includes/admin_header.php';
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="search" name="q" class="form-control" placeholder="Search name, username or email" value="<?php echo sanitize($search); ?>" maxlength="100">
       </div>
-      <select name="active" class="form-control" aria-label="Activity" onchange="this.form.submit()">
+      <select name="active" class="form-control" aria-label="Activity" data-autosubmit>
         <option value="">Any activity</option>
         <?php foreach ($activity_filters as $k => [$label]): ?>
           <option value="<?php echo $k; ?>" <?php echo $active === $k ? 'selected' : ''; ?>><?php echo $label; ?></option>
         <?php endforeach; ?>
       </select>
-      <select name="status" class="form-control" aria-label="Status" onchange="this.form.submit()">
+      <select name="status" class="form-control" aria-label="Status" data-autosubmit>
         <option value="">Any status</option>
         <option value="active" <?php echo $status === 'active' ? 'selected' : ''; ?>>Active accounts</option>
         <option value="blocked" <?php echo $status === 'blocked' ? 'selected' : ''; ?>>Blocked accounts</option>
       </select>
-      <select name="sort" class="form-control" aria-label="Sort" onchange="this.form.submit()">
+      <select name="sort" class="form-control" aria-label="Sort" data-autosubmit>
         <?php foreach ($sorts as $k => [$label]): ?>
           <option value="<?php echo $k; ?>" <?php echo $sort === $k ? 'selected' : ''; ?>>Sort: <?php echo $label; ?></option>
         <?php endforeach; ?>

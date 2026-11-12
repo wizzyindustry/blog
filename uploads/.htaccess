@@ -9,3 +9,8 @@
 </FilesMatch>
 
 Options -Indexes
+
+# Never run PHP in the uploads folder, whatever a file is called
+<IfModule php_module>
+    php_flag engine off
+</IfModule>

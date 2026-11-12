@@ -39,6 +39,9 @@ if ($locked) {
         $error_msg = 'Your session expired. Please try again.';
     } elseif ($login === '' || $password === '') {
         $error_msg = 'Please enter your username or email and your password.';
+    } elseif (account_login_locked('user', $login)) {
+        // Same wording as other lockouts, so it does not reveal whether the account exists
+        $error_msg = 'Too many failed login attempts. Please wait ' . LOGIN_LOCK_MINUTES . ' minutes and try again.';
     } elseif (mb_strlen($login) > 190 || strlen($password) > 255) {
         password_verify($password, USER_DUMMY_HASH);
         record_failed_login($pdo, 'user', $ip, $login);

@@ -1,0 +1,10 @@
+# Profile photos: only real image files are served, never scripts
+<FilesMatch "\.(jpg|png|webp|gif)$">
+    Require all granted
+</FilesMatch>
+<FilesMatch "^(?!.*\.(jpg|png|webp|gif)$)">
+    Require all denied
+</FilesMatch>
+<IfModule php_module>
+    php_flag engine off
+</IfModule>

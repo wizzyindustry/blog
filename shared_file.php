@@ -15,17 +15,7 @@ $stmt->execute([':id' => (int) input_text($_GET, 'id', '0')]);
 $file = $stmt->fetch();
 
 if (!$file) {
-    http_response_code(404);
-    $page_title = 'File not found';
-    $active_nav = 'shared';
-    require_once __DIR__ . '/includes/header.php';
-    echo '<main class="main-content"><div class="container"><div class="empty-state">'
-        . '<div class="empty-icon"><i class="fa-solid fa-file-circle-question"></i></div>'
-        . '<h1 class="empty-title">File not available</h1>'
-        . '<p class="empty-desc">This file does not exist or its owner made it private.</p>'
-        . '<a href="shared.php" class="btn btn-primary btn-sm">Browse shared files</a></div></div></main>';
-    require_once __DIR__ . '/includes/footer.php';
-    exit;
+    render_error_page(404, 'File not available', 'This file does not exist or its owner made it private.');
 }
 
 $id = (int) $file['id'];
@@ -44,6 +34,11 @@ $more_files = $more->fetchAll();
 
 $active_nav = 'shared';
 $page_title = $title;
+$meta_description = $file['description'] ?: strtoupper($file['extension']) . ' file shared by ' . $file['full_name'] . ' on UDOM Student Materials.';
+$meta_canonical = 'shared_file.php?id=' . $id;
+if (user_file_is_image($file)) {
+    $meta_image = 'account/file.php?id=' . $id . '&view=1';
+}
 require_once __DIR__ . '/includes/header.php';
 ?>
 

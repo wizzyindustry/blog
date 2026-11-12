@@ -22,8 +22,7 @@ $stmt->execute([':id' => (int) ($_GET['id'] ?? 0)]);
 $doc = $stmt->fetch();
 
 if (!$doc) {
-  header('Location: index.php');
-  exit;
+  render_error_page(404, 'Document not found', 'This document was removed or the link is incomplete.');
 }
 
 $type = $doc['file_type'];
@@ -42,6 +41,7 @@ $download_url = 'download.php?file=' . (int) $doc['id'];
 $active_nav = 'categories';
 $active_category = (string) $doc['post_category'];
 $page_title = $doc['original_name'];
+$meta_description = 'Preview and download "' . $doc['original_name'] . '", a document attached to a UDOM Student Materials post.';
 
 require_once __DIR__ . '/includes/header.php';
 ?>

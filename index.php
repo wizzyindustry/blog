@@ -33,6 +33,11 @@ $all_total = (int) $pdo->query('SELECT COUNT(*) FROM posts')->fetchColumn();
 $active_nav = $category !== '' ? 'categories' : 'home';
 $active_category = $category;
 $page_title = $category !== '' ? $category : 'Home';
+$meta_description = $category !== ''
+  ? ($category_row = find_category($category)) && $category_row['description'] ? $category_row['description'] : $category . ' study materials for University of Dodoma students.'
+  : 'Browse and search free study materials, lecture notes, past papers and campus news for University of Dodoma (UDOM) students.';
+$meta_canonical = 'index.php' . ($category !== '' ? '?category=' . rawurlencode($category) : '');
+$meta_noindex = $search !== '' || $page > 1; // Search results and deep pages are not indexed
 
 require_once __DIR__ . '/includes/header.php';
 ?>

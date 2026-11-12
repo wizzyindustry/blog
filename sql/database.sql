@@ -273,3 +273,42 @@ ALTER TABLE `user_files`
 ALTER TABLE `user_files`
   ADD CONSTRAINT `fk_user_files_category` FOREIGN KEY IF NOT EXISTS (`category`)
     REFERENCES `categories` (`name`) ON UPDATE CASCADE ON DELETE SET NULL;
+
+-- ==============================================================
+-- Comment replies and ownership (same as sql/upgrade_v4_comment_replies.sql)
+-- ==============================================================
+
+
+ALTER TABLE `comments`
+  ADD COLUMN IF NOT EXISTS `parent_id` INT DEFAULT NULL AFTER `post_id`,
+  ADD COLUMN IF NOT EXISTS `user_id` INT UNSIGNED DEFAULT NULL AFTER `parent_id`,
+  ADD COLUMN IF NOT EXISTS `updated_at` DATETIME DEFAULT NULL AFTER `created_at`,
+  ADD COLUMN IF NOT EXISTS `deleted_at` DATETIME DEFAULT NULL AFTER `updated_at`;
+
+ALTER TABLE `comments`
+  ADD INDEX IF NOT EXISTS `idx_comments_parent` (`parent_id`),
+  ADD INDEX IF NOT EXISTS `idx_comments_user` (`user_id`);
+
+-- Replies disappear with their parent only when the parent row is really deleted
+-- (which the site does only when nobody has replied to it).
+ALTER TABLE `comments`
+  ADD CONSTRAINT `fk_comments_parent` FOREIGN KEY IF NOT EXISTS (`parent_id`)
+    REFERENCES `comments` (`id`) ON DELETE CASCADE;
+
+-- Deleting a student account keeps their comments, shown as written by a guest
+ALTER TABLE `comments`
+  ADD CONSTRAINT `fk_comments_user` FOREIGN KEY IF NOT EXISTS (`user_id`)
+    REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+-- ==============================================================
+-- Terms acceptance + compressed storage (same as sql/upgrade_v5_legal_compression.sql)
+-- ==============================================================
+
+
+ALTER TABLE `users`
+  ADD COLUMN IF NOT EXISTS `terms_accepted_at` DATETIME DEFAULT NULL AFTER `status`,
+  ADD COLUMN IF NOT EXISTS `terms_version` VARCHAR(20) DEFAULT NULL AFTER `terms_accepted_at`;
+
+ALTER TABLE `user_files`
+  ADD COLUMN IF NOT EXISTS `stored_size` BIGINT UNSIGNED DEFAULT NULL AFTER `file_size`,
+  ADD COLUMN IF NOT EXISTS `is_compressed` TINYINT(1) NOT NULL DEFAULT 0 AFTER `stored_size`;

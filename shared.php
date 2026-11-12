@@ -17,6 +17,9 @@ $total = $result['total'];
 
 $active_nav = 'shared';
 $page_title = 'Shared Files';
+$meta_description = 'Notes, slides, past papers and images shared by University of Dodoma students. Filter by PDF, Word, PowerPoint, images and more.';
+$meta_canonical = 'shared.php';
+$meta_noindex = $search !== '' || $type !== 'any' || $category !== '' || $result['page'] > 1;
 require_once __DIR__ . '/includes/header.php';
 ?>
 
@@ -52,7 +55,7 @@ require_once __DIR__ . '/includes/header.php';
       <?php if ($search !== ''): ?><input type="hidden" name="q" value="<?php echo sanitize($search); ?>"><?php endif; ?>
       <?php if ($type !== 'any'): ?><input type="hidden" name="type" value="<?php echo $type; ?>"><?php endif; ?>
       <label for="category" class="visually-hidden">Category</label>
-      <select name="category" id="category" class="form-control" onchange="this.form.submit()">
+      <select name="category" id="category" class="form-control" data-autosubmit>
         <option value="">All categories</option>
         <?php foreach (get_categories() as $cat): ?>
           <option value="<?php echo sanitize($cat['name']); ?>" <?php echo $category === $cat['name'] ? 'selected' : ''; ?>><?php echo sanitize($cat['name']); ?></option>

@@ -8,8 +8,7 @@ require_once __DIR__ . '/config/db.php';
 $post_id = isset($_GET['id']) && is_numeric($_GET['id']) ? (int) $_GET['id'] : 0;
 
 if ($post_id <= 0) {
-  header('Location: index.php');
-  exit;
+  render_error_page(404, 'Post not found', 'This study material does not exist or the link is incomplete.');
 }
 
 // Fetch Post Details (prepared statement)
@@ -18,39 +17,119 @@ $stmt->execute([':id' => $post_id]);
 $post = $stmt->fetch();
 
 if (!$post) {
-  header('Location: index.php');
-  exit;
+  render_error_page(404, 'Post not found', 'This study material was removed or never existed. Try searching for it instead.');
 }
 
 $comment_error = '';
-$comment_success = isset($_GET['commented']) ? 'Thank you. Your comment has been published.' : '';
+$comment_success = '';
+$notices = [
+  'commented' => 'Thank you. Your comment has been published.',
+  'replied' => 'Your reply has been published.',
+  'edited' => 'Your comment was updated.',
+  'deleted' => 'The comment was deleted.',
+];
+foreach ($notices as $key => $text) {
+  if (isset($_GET[$key])) {
+    $comment_success = $text;
+  }
+}
+$viewer = current_user(); // Signed-in student, or null for a guest
 $author_name = '';
 $comment_body = '';
+$old = []; // Values to put back into a form after an error
+$reply_to = (int) input_text($_GET, 'reply', '0');
+$edit_id = (int) input_text($_GET, 'edit', '0');
+$focus_id = 0; // Comment to scroll back to after an error
 
-// Handle Comment Submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && input_text($_POST, 'action') === 'add_comment') {
-  $author_name = trim(input_text($_POST, 'name'));
-  $comment_body = trim(input_text($_POST, 'comment'));
+// ---------- Comment actions: add / reply, edit, delete (all POST + CSRF, checked on the server) ----------
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $action = input_text($_POST, 'action');
+  $ip = client_ip();
+  $comment_id = (int) input_text($_POST, 'comment_id', '0');
 
-  if ($author_name === '' || $comment_body === '') {
-    $comment_error = 'Please enter both your name and your comment.';
-  } elseif (mb_strlen($author_name) < 2 || mb_strlen($author_name) > 100) {
-    $comment_error = 'Name must be between 2 and 100 characters.';
-  } elseif (mb_strlen($comment_body) < 3 || mb_strlen($comment_body) > 2000) {
-    $comment_error = 'Comment must be between 3 and 2000 characters.';
+  if (!in_array($action, ['add_comment', 'edit_comment', 'delete_comment'], true)) {
+    $comment_error = 'Unknown action.';
+  } elseif (!csrf_valid()) {
+    $comment_error = 'Your session expired. Please try again.';
+  } elseif ($action === 'add_comment') {
+    // New comment, or a reply when parent_id is set. Anyone may reply to anyone.
+    $parent_id = (int) input_text($_POST, 'parent_id', '0');
+    $parent = $parent_id > 0 ? find_comment($pdo, $parent_id, $post_id) : null;
+    [$author_name, $comment_body, $problem] = validate_comment_input($viewer);
+
+    if (input_text($_POST, 'website') !== '') {
+      $comment_error = 'Your comment could not be posted.'; // Hidden field filled in: a spam bot
+    } elseif (rate_limited('comment', $ip, 5, 10)) {
+      $comment_error = 'You are posting comments too quickly. Please wait a few minutes and try again.';
+    } elseif ($parent_id > 0 && (!$parent || $parent['deleted_at'] !== null)) {
+      $comment_error = 'The comment you replied to no longer exists.';
+    } elseif ($problem !== null) {
+      $comment_error = $problem;
+    } else {
+      rate_hit('comment', $ip);
+      try {
+        $stmt = $pdo->prepare(
+          'INSERT INTO comments (post_id, parent_id, user_id, name, comment) VALUES (:post_id, :parent, :uid, :name, :comment)'
+        );
+        $stmt->execute([
+          ':post_id' => $post_id,
+          ':parent' => $parent ? (int) $parent['id'] : null,
+          ':uid' => $viewer ? (int) $viewer['id'] : null,
+          ':name' => $author_name,
+          ':comment' => $comment_body,
+        ]);
+        $new_id = (int) $pdo->lastInsertId();
+        if (!$viewer) {
+          remember_guest_comment($new_id); // Guests may edit/delete from this browser session
+        }
+        // Redirect after POST so refreshing the page does not submit the comment twice
+        header('Location: post.php?id=' . $post_id . '&' . ($parent ? 'replied' : 'commented') . '=1#comment-' . $new_id);
+        exit;
+      } catch (PDOException $e) {
+        error_log('Comment insert failed: ' . $e->getMessage());
+        $comment_error = 'Failed to submit comment. Please try again.';
+      }
+    }
+    if ($comment_error !== '' && $parent_id > 0) {
+      $reply_to = $parent_id; // Re-open the reply form with what was typed
+      $focus_id = $parent_id;
+      $old = ['name' => $author_name, 'reply_body' => $comment_body];
+      $comment_body = '';
+    }
   } else {
-    try {
-      $stmt = $pdo->prepare("INSERT INTO comments (post_id, name, comment) VALUES (:post_id, :name, :comment)");
-      $stmt->execute([
-        ':post_id' => $post_id,
-        ':name' => $author_name,
-        ':comment' => $comment_body
-      ]);
-      // Redirect after POST so refreshing the page does not submit the comment twice
-      header('Location: post.php?id=' . $post_id . '&commented=1#comments');
-      exit;
-    } catch (PDOException $e) {
-      $comment_error = 'Failed to submit comment. Please try again.';
+    // Edit / delete: only the author (admin may delete for moderation, never edit)
+    $target = $comment_id > 0 ? find_comment($pdo, $comment_id, $post_id) : null;
+
+    if (!$target || $target['deleted_at'] !== null) {
+      $comment_error = 'That comment no longer exists.';
+    } elseif ($action === 'edit_comment') {
+      if (!can_manage_comment($target)) {
+        http_response_code(403);
+        $comment_error = 'You can only edit your own comments.';
+      } else {
+        [, $new_body, $problem] = validate_comment_input($viewer, false);
+        if ($problem !== null) {
+          $comment_error = $problem;
+          $edit_id = $focus_id = $comment_id;
+          $old = ['edit_body' => $new_body];
+        } else {
+          if ($new_body !== $target['comment']) {
+            $pdo->prepare('UPDATE comments SET comment = :c, updated_at = NOW() WHERE id = :id')
+              ->execute([':c' => $new_body, ':id' => $comment_id]);
+          }
+          header('Location: post.php?id=' . $post_id . '&edited=1#comment-' . $comment_id);
+          exit;
+        }
+      }
+    } else { // delete_comment
+      if (!can_manage_comment($target) && !is_admin_viewer()) {
+        http_response_code(403);
+        $comment_error = 'You can only delete your own comments.';
+      } else {
+        delete_comment($pdo, $target);
+        header('Location: post.php?id=' . $post_id . '&deleted=1#comments');
+        exit;
+      }
     }
   }
 }
@@ -60,12 +139,15 @@ $active_nav = 'categories';
 $active_category = (string) $post['category'];
 
 $page_title = $post['title'];
+$meta_description = $post['excerpt'] ?: meta_excerpt($post['content']);
+$meta_canonical = 'post.php?id=' . $post_id;
+$meta_image = 'uploads/' . basename((string) ($post['image'] ?: DEFAULT_POST_IMAGE));
+$meta_type = 'article';
 
-// Fetch Comments for this Post
-$comment_stmt = $pdo->prepare("SELECT * FROM comments WHERE post_id = :id ORDER BY created_at DESC");
-$comment_stmt->execute([':id' => $post_id]);
-$comments = $comment_stmt->fetchAll();
-$total_comments = count($comments);
+// Comments of this post as a tree (comments with their replies)
+$comment_tree = get_comment_tree($pdo, $post_id);
+$total_comments = $comment_tree['count'];
+$comment_ctx = ['post_id' => $post_id, 'user' => $viewer, 'reply_to' => $reply_to, 'edit_id' => $edit_id, 'old' => $old];
 
 // Documents attached to this post (PDF, Word, PowerPoint)
 $attachments = get_post_attachments($pdo, $post_id);
@@ -117,7 +199,7 @@ require_once __DIR__ . '/includes/header.php';
       <div class="post-detail-featured-image is-<?php echo post_image_orientation($post); ?>"
         style="<?php echo post_image_style($post); ?>">
         <img src="<?php echo post_image_url($post['image']); ?>" alt="<?php echo sanitize($post['title']); ?>"
-          onerror="this.onerror=null;this.src='uploads/<?php echo DEFAULT_POST_IMAGE; ?>';">
+          data-fallback="uploads/<?php echo DEFAULT_POST_IMAGE; ?>">
       </div>
 
       <?php if ((int) $post['allow_image_download'] === 1): ?>
@@ -231,49 +313,27 @@ require_once __DIR__ . '/includes/header.php';
         <h3 class="comment-form-title">
           <i class="fa-solid fa-pen"></i> Leave a Comment
         </h3>
-        <form action="post.php?id=<?php echo $post_id; ?>#comments" method="POST">
+        <form action="post.php?id=<?php echo $post_id; ?>#comments" method="POST" id="comment-form">
           <input type="hidden" name="action" value="add_comment">
-
-          <div class="form-group">
-            <label for="comment-name" class="form-label">Your Full Name</label>
-            <input type="text" name="name" id="comment-name" class="form-control" placeholder="e.g. Kelvin Massawe"
-              required minlength="2" maxlength="100" value="<?php echo sanitize($author_name); ?>">
+          <?php echo comment_form_fields($viewer, 'comment', $author_name, $comment_body, 'Write your constructive thoughts or academic question here...'); ?>
+          <div class="comment-form-footer">
+            <button type="submit" class="btn btn-primary" data-loading-text="Posting...">
+              <i class="fa-solid fa-paper-plane"></i> Submit Comment
+            </button>
+            <?php if (!$viewer): ?>
+              <span class="text-muted comment-form-note">
+                <a href="account/login.php">Sign in</a> to comment with your account and edit or delete your comments any time.
+              </span>
+            <?php endif; ?>
           </div>
-
-          <div class="form-group">
-            <label for="comment-text" class="form-label">Your Comment or Question</label>
-            <textarea name="comment" id="comment-text" class="form-control"
-              placeholder="Write your constructive thoughts or academic question here..." required
-              minlength="3" maxlength="2000"><?php echo sanitize($comment_body); ?></textarea>
-          </div>
-
-          <button type="submit" class="btn btn-primary" data-loading-text="Posting...">
-            <i class="fa-solid fa-paper-plane"></i> Submit Comment
-          </button>
         </form>
       </div>
 
       <!-- Comments List -->
-      <div class="comments-list">
-        <?php if (!empty($comments)): ?>
-          <?php foreach ($comments as $comment): ?>
-            <div class="comment-item">
-              <div class="comment-avatar">
-                <i class="fa-solid fa-user"></i>
-              </div>
-              <div class="comment-content">
-                <div class="comment-meta">
-                  <span class="comment-author"><?php echo sanitize($comment['name']); ?></span>
-                  <span class="comment-date">
-                    <i class="fa-regular fa-clock"></i>
-                    <?php echo date('M d, Y \a\t H:i', strtotime($comment['created_at'])); ?>
-                  </span>
-                </div>
-                <p class="comment-text">
-                  <?php echo nl2br(sanitize($comment['comment'])); ?>
-                </p>
-              </div>
-            </div>
+      <div class="comments-list"<?php echo $focus_id ? ' data-focus="comment-' . $focus_id . '"' : ''; ?>>
+        <?php if ($comment_tree['roots']): ?>
+          <?php foreach ($comment_tree['roots'] as $root): ?>
+            <?php echo render_comment($root, $comment_tree, 1, $comment_ctx); ?>
           <?php endforeach; ?>
         <?php else: ?>
           <div class="empty-state">
@@ -283,6 +343,19 @@ require_once __DIR__ . '/includes/header.php';
           </div>
         <?php endif; ?>
       </div>
+
+      <!-- Reply form copied under a comment by main.js when "Reply" is clicked -->
+      <template id="reply-template">
+        <form action="post.php?id=<?php echo $post_id; ?>" method="POST" class="comment-reply-form">
+          <input type="hidden" name="action" value="add_comment">
+          <input type="hidden" name="parent_id" value="">
+          <?php echo comment_form_fields($viewer, 'reply-new', '', '', 'Write your reply...'); ?>
+          <div class="comment-form-actions">
+            <button type="submit" class="btn btn-primary btn-sm" data-loading-text="Posting..."><i class="fa-solid fa-paper-plane"></i> Post Reply</button>
+            <button type="button" class="btn btn-outline btn-sm" data-reply-cancel>Cancel</button>
+          </div>
+        </form>
+      </template>
     </section>
 
   </div>

@@ -79,18 +79,18 @@ require __DIR__ . '/includes/account_header.php';
       <i class="fa-solid fa-magnifying-glass"></i>
       <input type="search" name="q" class="form-control" placeholder="Search file name or description" value="<?php echo sanitize($search); ?>" maxlength="100">
     </div>
-    <select name="kind" class="form-control" aria-label="File type" onchange="this.form.submit()">
+    <select name="kind" class="form-control" aria-label="File type" data-autosubmit>
       <option value="">All types</option>
       <?php foreach (FILE_KINDS as $k => [$label]): ?>
         <option value="<?php echo $k; ?>" <?php echo $kind === $k ? 'selected' : ''; ?>><?php echo $label; ?></option>
       <?php endforeach; ?>
     </select>
-    <select name="visibility" class="form-control" aria-label="Visibility" onchange="this.form.submit()">
+    <select name="visibility" class="form-control" aria-label="Visibility" data-autosubmit>
       <option value="">Public &amp; private</option>
       <option value="public" <?php echo $visibility === 'public' ? 'selected' : ''; ?>>Public (shared)</option>
       <option value="private" <?php echo $visibility === 'private' ? 'selected' : ''; ?>>Private (only me)</option>
     </select>
-    <select name="sort" class="form-control" aria-label="Sort" onchange="this.form.submit()">
+    <select name="sort" class="form-control" aria-label="Sort" data-autosubmit>
       <?php foreach ($sorts as $k => [$label]): ?>
         <option value="<?php echo $k; ?>" <?php echo $sort === $k ? 'selected' : ''; ?>><?php echo $label; ?></option>
       <?php endforeach; ?>

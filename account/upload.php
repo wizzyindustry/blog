@@ -11,8 +11,8 @@ $errors = [];
 $max_bytes = user_max_file_bytes();
 
 // Pre-select a type from the link, e.g. upload.php?type=pdf
-$type = input_text($_POST, 'type', input_text($_GET, 'type', 'any'));
-$type = isset(UPLOAD_TYPES[$type]) ? $type : 'any';
+$type = input_text($_POST, 'type', input_text($_GET, 'type', 'pdf'));
+$type = isset(UPLOAD_TYPES[$type]) && $type !== 'any' ? $type : 'pdf'; // An upload type must always be chosen
 $details = ['title' => '', 'description' => '', 'visibility' => 'private', 'category' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -20,7 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'The selected files are larger than the server allows in one upload (' . format_bytes(ini_bytes('post_max_size')) . '). Upload fewer files at a time.';
     } elseif (!csrf_valid()) {
         $errors[] = 'Your session expired. Please try again.';
+    } elseif (rate_limited('upload', 'u:' . (int) $user['id'], 30, 60)) {
+        $errors[] = 'You have uploaded a lot in the last hour. Please wait a while before uploading more.';
     } else {
+        rate_hit('upload', 'u:' . (int) $user['id']);
         [$details, $errors] = validate_file_details();
         $saved = 0;
         if (!$errors) {
@@ -74,7 +77,7 @@ require __DIR__ . '/includes/account_header.php';
       <fieldset class="choice-fieldset">
         <legend class="step-title"><span class="step-num">1</span> What are you uploading?</legend>
         <div class="type-grid">
-          <?php foreach (UPLOAD_TYPES as $key => [$label, $icon, $exts]): ?>
+          <?php foreach (array_diff_key(UPLOAD_TYPES, ['any' => 1]) as $key => [$label, $icon, $exts]): ?>
             <label class="type-option">
               <input type="radio" name="type" value="<?php echo $key; ?>" <?php echo $type === $key ? 'checked' : ''; ?>
                 data-accept="<?php echo sanitize(upload_type_accept($key)); ?>"
@@ -88,7 +91,7 @@ require __DIR__ . '/includes/account_header.php';
           <?php endforeach; ?>
         </div>
         <p class="form-hint" id="type-hint">
-          <?php echo UPLOAD_TYPES[$type][2] ? 'Allowed: ' . strtoupper(implode(', ', UPLOAD_TYPES[$type][2])) : 'Every file type is allowed.'; ?>
+          Allowed: <?php echo sanitize(strtoupper(implode(', ', UPLOAD_TYPES[$type][2]))); ?>
         </p>
       </fieldset>
 

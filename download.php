@@ -16,15 +16,7 @@ require_once __DIR__ . '/config/db.php';
 /** Stop with a simple "not found" page. */
 function file_not_found(string $message = 'This file is not available.'): void
 {
-  http_response_code(404);
-  header('Content-Type: text/html; charset=utf-8');
-  echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
-    . '<title>File not found</title><link rel="stylesheet" href="' . asset_url('assets/css/style.css') . '"></head>'
-    . '<body class="login-body"><div class="login-card"><div class="login-body-content" style="text-align:center;">'
-    . '<h1 style="font-size:22px;margin-bottom:8px;">File not found</h1><p class="text-muted" style="margin-bottom:20px;">'
-    . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p><a class="btn btn-primary" href="index.php">Back to materials</a>'
-    . '</div></div></body></html>';
-  exit;
+  render_error_page(404, 'File not found', $message);
 }
 
 /** Send a file with safe headers. $inline = show in browser instead of saving. */

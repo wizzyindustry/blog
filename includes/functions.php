@@ -324,21 +324,9 @@ function clean_post_html(?string $html): string
         return $out;
     }
 
-    $allowed = '<p><br><h2><h3><h4><strong><b><em><i><u><ul><ol><li><blockquote>'
-        . '<a><code><pre><hr><table><thead><tbody><tr><th><td><img>';
-    $html = strip_tags($html, $allowed);
-
-    // Remove inline event handlers such as onclick="..." / onerror=...
-    $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
-
-    // Neutralise dangerous URL schemes in href/src attributes.
-    $html = preg_replace(
-        '/\b(href|src)\s*=\s*(["\']?)\s*(?:javascript|vbscript|data)\s*:[^"\'>\s]*\2/i',
-        '$1="#"',
-        $html
-    );
-
-    return $html;
+    // Allow-list DOM sanitizer (includes/security.php): only safe tags, attributes and URL
+    // schemes survive. Replaces the old regex filter, which encoded payloads could slip past.
+    return sanitize_html($html);
 }
 
 /* --------------------------------------------------------------
@@ -415,7 +403,7 @@ function render_post_card(array $post): string
       <article class="post-card">
         <div class="post-card-thumb is-' . post_image_orientation($post) . '" style="' . post_image_style($post) . '">
           <img src="' . post_image_url($post['image']) . '" alt="' . $title . '" loading="lazy"
-            onerror="this.onerror=null;this.src=\'uploads/' . DEFAULT_POST_IMAGE . '\';">
+            data-fallback="uploads/' . DEFAULT_POST_IMAGE . '">
           <span class="category-badge">' . sanitize($post['category']) . '</span>
         </div>
         <div class="post-card-body">
@@ -660,8 +648,11 @@ function handle_image_upload(string $field, ?string &$error, ?array &$size = nul
         return null;
     }
 
+    // Shrink + strip metadata when the server has GD (see compress_image_file())
+    $new_dims = function_exists('compress_image_file') ? compress_image_file($upload_dir . $new_name, $allowed[$info['mime']]) : null;
+
     // Real pixel size, used to frame the image in its own shape (ratio "Original")
-    $size = [(int) $info[0], (int) $info[1]];
+    $size = $new_dims ?: [(int) $info[0], (int) $info[1]];
 
     return $new_name;
 }
@@ -690,14 +681,67 @@ function delete_uploaded_image(?string $file_name): void
  * Sessions & CSRF protection (admin forms)
  * ------------------------------------------------------------ */
 
+const ADMIN_IDLE_MINUTES = 30;   // Admin is signed out after 30 minutes without activity
+const USER_IDLE_MINUTES = 120;   // Students after 2 hours
+const SESSION_ROTATE_SECONDS = 900; // New session ID every 15 minutes
+
 /**
- * Start the session once, with safer cookie settings.
+ * Start the session once, with hardened cookie settings:
+ *  - Secure (HTTPS only), HttpOnly (no JavaScript access), SameSite=Lax (not sent on cross-site POSTs)
+ *  - __Host- prefix on HTTPS: the browser refuses the cookie unless it is Secure, host-only and Path=/
+ *  - strict mode (unknown session IDs are rejected), cookies only (no IDs in URLs)
+ *  - idle timeouts, periodic ID rotation and a browser fingerprint check against stolen cookies
  */
 function start_session(): void
 {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax']);
-        session_start();
+    if (session_status() !== PHP_SESSION_NONE) {
+        return;
+    }
+    $secure = is_https();
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.use_trans_sid', '0');
+    ini_set('session.sid_length', '48');
+    ini_set('session.sid_bits_per_character', '6');
+    ini_set('session.cookie_lifetime', '0');
+    ini_set('session.gc_maxlifetime', (string) (USER_IDLE_MINUTES * 60));
+    session_name($secure ? '__Host-udom_sid' : 'udom_sid');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $secure,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    session_start();
+
+    $now = time();
+    $fingerprint = hash('sha256', (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+
+    // A session cookie replayed from a different browser is thrown away
+    if (isset($_SESSION['fp']) && !hash_equals($_SESSION['fp'], $fingerprint)) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+    }
+    $_SESSION['fp'] = $fingerprint;
+
+    // Idle timeouts (admin and student sign-ins expire separately)
+    $last = (int) ($_SESSION['last_activity'] ?? $now);
+    if (!empty($_SESSION['admin_logged_in']) && $now - $last > ADMIN_IDLE_MINUTES * 60) {
+        unset($_SESSION['admin_logged_in'], $_SESSION['admin_id'], $_SESSION['admin_username'], $_SESSION['admin_must_change']);
+        $_SESSION['flash']['error'] = 'You were signed out after ' . ADMIN_IDLE_MINUTES . ' minutes of inactivity.';
+    }
+    if (!empty($_SESSION['user_id']) && $now - $last > USER_IDLE_MINUTES * 60) {
+        unset($_SESSION['user_id'], $_SESSION['user_username'], $_SESSION['user_seen_at']);
+    }
+    $_SESSION['last_activity'] = $now;
+
+    // Rotate the session ID regularly (limits the value of a leaked ID)
+    if (!isset($_SESSION['created_at'])) {
+        $_SESSION['created_at'] = $now;
+    } elseif ($now - (int) $_SESSION['created_at'] > SESSION_ROTATE_SECONDS) {
+        session_regenerate_id(true);
+        $_SESSION['created_at'] = $now;
     }
 }
 
@@ -727,6 +771,15 @@ function csrf_field(): string
 function csrf_valid(): bool
 {
     start_session();
+    // Defence in depth: a POST sent by another website carries that site's Origin header
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? ($_SERVER['HTTP_REFERER'] ?? '');
+    if ($origin !== '' && $origin !== 'null') {
+        $origin_host = strtolower((string) parse_url($origin, PHP_URL_HOST));
+        $own_host = strtolower((string) parse_url('http://' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST));
+        if ($origin_host !== '' && $origin_host !== $own_host) {
+            return false;
+        }
+    }
     return isset($_POST['csrf_token'], $_SESSION['csrf_token'])
         && is_string($_POST['csrf_token'])
         && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token']);

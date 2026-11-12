@@ -50,6 +50,8 @@ if ($locked) {
     $error_msg = 'Your session expired. Please try again.';
   } elseif ($username === '' || $password === '') {
     $error_msg = 'Please enter both username and password.';
+  } elseif (account_login_locked('admin', $username)) {
+    $error_msg = 'Too many failed login attempts. Please wait ' . LOGIN_WINDOW_MINUTES . ' minutes and try again.';
   } elseif (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $username) || strlen($password) > 255) {
     // Input that can never be a valid account (e.g. contains quotes, spaces,
     // SQL keywords with symbols) is rejected before touching the database.
@@ -74,6 +76,10 @@ if ($locked) {
         $_SESSION['admin_logged_in'] = true;
         $_SESSION['admin_id'] = (int) $admin['id'];
         $_SESSION['admin_username'] = $admin['username'];
+        // Still the published default password (or a trivially weak one): force a change first
+        if (hash_equals('admin123', $password) || strlen($password) < 12) {
+          $_SESSION['admin_must_change'] = true;
+        }
         unset($_SESSION['csrf_token']);
         csrf_token(); // Fresh CSRF token for the admin session
 
@@ -119,14 +125,11 @@ if ($locked) {
   <meta name="robots" content="noindex, nofollow">
   <title>Admin Login - UDOM Student Materials</title>
 
-  <!-- Inter Font -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?php echo render_head_meta(['description' => 'Administrator sign in.', 'noindex' => true], '../'); ?>
 
   <!-- Font Awesome 6 (icons only, no emojis) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
     crossorigin="anonymous" referrerpolicy="no-referrer" />
 
   <!-- Main Stylesheet -->

@@ -1,0 +1,23 @@
+# ------------------------------------------------------------------
+# Admin area lock: only reachable from THIS computer (localhost).
+# Everyone else gets "403 Forbidden" before any PHP code runs.
+#
+# To manage the site from another trusted device, add its IP address, e.g.:
+#   Require ip 192.168.1.25
+# (one line per address, inside the RequireAny block below)
+# ------------------------------------------------------------------
+<RequireAny>
+    Require local
+</RequireAny>
+
+# Never cache admin pages or show them in search engines
+<IfModule mod_headers.c>
+    Header always set Cache-Control "no-store, no-cache, must-revalidate, private"
+    Header always set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+
+# Helper templates are never opened directly
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^includes/ - [F,L]
+</IfModule>

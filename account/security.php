@@ -16,10 +16,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hash_stmt->execute([':id' => (int) $user['id']]);
     $hash = (string) $hash_stmt->fetchColumn();
 
-    if (!csrf_valid()) {
-        $errors[$action ?: 'password'] = 'Your session expired. Please try again.';
+    $who = 'u:' . (int) $user['id'];
+    if (!in_array($action, ['password', 'delete'], true)) {
+        $errors['password'] = 'Unknown action.';
+    } elseif (!csrf_valid()) {
+        $errors[$action] = 'Your session expired. Please try again.';
+    } elseif (rate_limited('password', $who, 5, 15)) {
+        $errors[$action] = 'Too many wrong passwords. Please wait 15 minutes and try again.';
     } elseif (!password_verify($current, $hash)) {
-        $errors[$action === 'delete' ? 'delete' : 'password'] = 'Your current password is incorrect.';
+        rate_hit('password', $who);
+        $errors[$action] = 'Your current password is incorrect.';
     } elseif ($action === 'password') {
         $new = input_text($_POST, 'new_password');
         $problem = password_problem($new, input_text($_POST, 'new_password_confirm'));

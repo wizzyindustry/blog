@@ -29,13 +29,27 @@ browser restarts and server restarts.
 |----------|------------|
 | `admin`  | `admin123` |
 
-Change the password after first login. To set a new one, generate a hash with
-`php -r "echo password_hash('NEW_PASSWORD', PASSWORD_DEFAULT);"` and update the `admins` table in phpMyAdmin.
+This default only works once: signing in with it opens a **mandatory password change** (at least 12
+characters with upper and lower case letters, a number and a symbol) before any other admin page will load.
+The admin area is reachable only from the computer running XAMPP (`admin/.htaccess`).
 
-### Database settings
+### Database settings and secrets
 
-`config/db.php` uses the XAMPP defaults (`root`, empty password, database `udom_blog`). Edit it if your MySQL
-setup differs.
+Credentials are **not** in the code. They live in `config/secrets.php`, which git ignores. On a new
+machine:
+
+1. Copy `config/secrets.example.php` to `config/secrets.php`.
+2. As MySQL `root`, create the least-privilege account the site uses:
+   `CREATE USER 'udom_app'@'localhost' IDENTIFIED BY '<long random password>';`
+   `GRANT SELECT, INSERT, UPDATE, DELETE ON udom_blog.* TO 'udom_app'@'localhost';`
+3. Put that password in `config/secrets.php`.
+
+Environment variables (`DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, `FORCE_HTTPS`) override the file.
+Run the `sql/*.sql` schema and upgrade files as `root` in phpMyAdmin: the site's own account cannot
+create or alter tables. While the site is not live it runs on **plain HTTP** (`FORCE_HTTP => true`): HTTPS requests are
+redirected to <http://localhost/blog>. To go live, get a real certificate, set `FORCE_HTTP => false` and
+`FORCE_HTTPS => true` in `config/secrets.php`, and follow the "WHEN THE SITE GOES LIVE" notes in
+`.htaccess` (HTTPS redirect, and a one-year HSTS header).
 
 ---
 
@@ -117,6 +131,49 @@ sql/database.sql              Full schema and sample data for phpMyAdmin
   Guests can view and download public files; private files stay private.
 - **Admins** see Public / Private in *User Uploads*, can filter by it, and can make any public file
   private (removing it from the Materials page) or delete it. Files of blocked users are hidden.
+
+## Pages, SEO, Privacy and UX (v5)
+
+- **Upgrading:** import `sql/upgrade_v5_legal_compression.sql` as `root` (safe to run twice).
+- **Error screens:** `error.php` and `includes/error_page.php` give one branded screen for
+  400/401/403/404/405/408/413/429/500/502/503/504.
+  - Apache uses them through `ErrorDocument` in `.htaccess`. Those lines contain the project folder,
+    `/blog`; change it if you move the site.
+  - Server errors show a reference code that also appears in `logs/php-errors.log`.
+  - An offline notice appears when the connection drops.
+- **New pages:** `faq.php`, `privacy.php`, `terms.php` and `cookies.php`. Set `CONTACT_EMAIL` in
+  `config/secrets.php` to show your contact address on them.
+- **SEO:** every page has a meta description, a canonical URL and Open Graph / Twitter tags.
+  - Favicons live in `favicon.ico` and `assets/img/`, plus `site.webmanifest`.
+  - `robots.txt`, `sitemap.xml` and `llms.txt` are generated from the database (`robots.php`,
+    `sitemap.php`, `llms.php`). Set `APP_URL` once the site has a public address.
+- **Sign-up** requires ticking the Terms & Privacy checkbox. This is enforced on the server, and the
+  date and version are stored.
+- **Cookie banner:** only essential cookies are used. Google Fonts (Inter) loads only after
+  *Accept all*; "Cookie settings" in the footer reopens the banner.
+- **Compression:**
+  - **In the browser:** images are resized and re-encoded before upload (up to 2560px for uploads,
+    1920px for post images, 512px for avatars), which also removes GPS/EXIF data.
+  - **On the server:** TXT, MD, CSV, RTF, DOC, XLS, PPT, BMP and WAV files are stored
+    gzip-compressed and served back unchanged.
+  - **Server-side image re-encoding** needs PHP's GD extension. In `C:\xampp\php\php.ini`, change
+    `;extension=gd` to `extension=gd` and restart Apache.
+- **UX:** an eye button shows or hides any password, and destructive actions open a confirmation
+  dialog instead of the browser's `confirm()` box.
+
+## Comment Replies (v4)
+
+- **Upgrading:** import `sql/upgrade_v4_comment_replies.sql` as `root` (safe to run twice).
+- Anyone can **reply** to any comment, including replies. Threads indent up to 3 levels; deeper
+  replies say "Replying to <name>".
+- **Only the author can edit or delete a comment.** This is checked on the server, not just hidden
+  in the page.
+  - A signed-in student owns their comments on any device.
+  - A guest can edit or delete only from the browser session that posted the comment.
+  - Edited comments show "(edited)".
+  - The admin can delete any comment for moderation, but cannot edit other people's words.
+- Deleting a comment that has replies leaves "This comment was deleted", so other people's replies
+  stay. The placeholder disappears once its replies are gone.
 
 ## Features
 

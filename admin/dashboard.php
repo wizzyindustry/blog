@@ -140,8 +140,9 @@ $chart_data = [
 $flash_success = get_flash('success');
 $flash_error = get_flash('error');
 
-$page_scripts = '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>'
-    . '<script>window.DASHBOARD_DATA = ' . json_encode($chart_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';</script>';
+$page_scripts = '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js" integrity="sha512-Y51n9mtKTVBh3Jbx5pZSJNDDMyY+yGe77DGtBPzRlgsf/YLCh13kSZ3JmfHGzYFCmOndraf0sQgfM654b7dJ3w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>'
+    // Chart data as a JSON data block (not executable, so it is allowed by the Content-Security-Policy)
+    . '<script type="application/json" id="dashboard-data">' . json_encode($chart_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . '</script>';
 
 require_once __DIR__ . '/includes/admin_header.php';
 ?>

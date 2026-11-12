@@ -16,6 +16,12 @@ $search = mb_substr($search, 0, 100);
 $category = normalize_category(input_text($_GET, 'category'));
 $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
 
+// At most 120 live searches per minute per IP address (stops scraping / flooding the database)
+if (rate_limited('search', client_ip(), 120, 1)) {
+    too_many_requests('Too many searches. Please slow down.', true);
+}
+rate_hit('search', client_ip());
+
 try {
     $result = get_posts_page($pdo, $search, $category, $page);
     $shared = get_shared_files_page($pdo, $search, $category, 'any', 1, 8);

@@ -31,10 +31,7 @@ if ($file && !$is_owner && !$is_admin && !$is_public && !$viewer) {
 
 $path = $file ? user_files_dir() . basename($file['file_name']) : '';
 if (!$file || (!$is_owner && !$is_admin && !$is_public) || !is_file($path)) {
-    http_response_code(404);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'File not found.';
-    exit;
+    render_error_page(404, 'File not found', 'This file does not exist, was deleted, or is private.');
 }
 
 if ($viewer) {
@@ -48,9 +45,13 @@ if ($inline && strpos($mime, 'text/') === 0) {
     $mime .= '; charset=utf-8';
 }
 
-$size = filesize($path);
+$compressed = !empty($file['is_compressed']);
+$size = $compressed ? (int) $file['file_size'] : filesize($path);
 $start = 0;
 $end = $size - 1;
+if ($compressed) {
+    unset($_SERVER['HTTP_RANGE']); // Stored gzip-compressed: always sent whole, decompressed
+}
 
 // Single byte-range support (video/audio seeking, resumable downloads)
 if (isset($_SERVER['HTTP_RANGE']) && preg_match('/^bytes=(\d*)-(\d*)$/', $_SERVER['HTTP_RANGE'], $m)) {
@@ -91,15 +92,21 @@ if ($inline && strpos($mime, 'text/') === 0) {
     header('Content-Security-Policy: sandbox'); // Plain text is never run as a page
 }
 
-$fh = fopen($path, 'rb');
-fseek($fh, $start);
+// gzopen() reads gzip-compressed files transparently (and plain files as they are)
+$fh = $compressed ? gzopen($path, 'rb') : fopen($path, 'rb');
+if (!$compressed) {
+    fseek($fh, $start);
+}
 $left = $end - $start + 1;
 set_time_limit(0);
-while ($left > 0 && !feof($fh) && !connection_aborted()) {
-    $chunk = fread($fh, (int) min(1048576, $left));
+while ($left > 0 && !($compressed ? gzeof($fh) : feof($fh)) && !connection_aborted()) {
+    $chunk = $compressed ? gzread($fh, (int) min(1048576, $left)) : fread($fh, (int) min(1048576, $left));
+    if ($chunk === false || $chunk === '') {
+        break;
+    }
     echo $chunk;
     flush();
     $left -= strlen($chunk);
 }
-fclose($fh);
+$compressed ? gzclose($fh) : fclose($fh);
 exit;
