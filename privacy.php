@@ -40,6 +40,8 @@ legal_page_start('Privacy Policy', 'What we collect, why, how long we keep it, a
   <h2>What we collect</h2>
   <h3>When you create an account</h3>
   <p>Your full name, username, email address and password. The password is stored only as a one-way hash, so nobody (including the administrator) can read it. We also record when you accepted these terms and which version.</p>
+  <h3>If you sign in with Google</h3>
+  <p>When you choose <em>Continue with Google</em>, Google tells us your name, your email address (and that Google has verified it) and your Google account ID, a number that identifies your Google account. We store the ID so we can recognise you next time, and use the name and email to create your account. We do <strong>not</strong> receive your Google password, and we do not keep the Google access tokens issued during sign-in, so we cannot read your Gmail, Drive or anything else in your Google account. You can disconnect Google at any time under <em>Password &amp; Security</em>. Google's own handling of the sign-in is covered by Google's privacy policy.</p>
   <h3>When you use your account</h3>
   <ul>
     <li><strong>Profile:</strong> an optional bio and profile photo.</li>
@@ -48,6 +50,8 @@ legal_page_start('Privacy Policy', 'What we collect, why, how long we keep it, a
     <li><strong>Sign-in history:</strong> the date, IP address and browser of each sign-in, shown to you under <em>Password &amp; Security</em> so you can spot unknown access.</li>
     <li><strong>Activity:</strong> when you were last active, so the administrator can see how many people use the site.</li>
   </ul>
+  <h3>Password reset emails</h3>
+  <p>If you use <em>Forgot password?</em>, we email a one-time link to the address on your account and record when it was requested and from which IP address. Only a scrambled (hashed) copy of the link is stored; it expires after 30 minutes and is deleted within a day. We also email you when your password is changed, so you notice if it was not you.</p>
   <h3>When you visit without an account</h3>
   <p>If you comment as a guest, we store the name and comment you enter. Like every website, the server briefly records your IP address to block abuse (for example repeated failed logins or spam). See the <a href="cookies.php">Cookie Policy</a> for the two cookies we use.</p>
   <h3>Images you upload</h3>
@@ -81,6 +85,7 @@ legal_page_start('Privacy Policy', 'What we collect, why, how long we keep it, a
   <ul>
     <li><strong>Cloudflare (cdnjs):</strong> delivers the icon font and chart library, so it receives your IP address when pages load.</li>
     <li><strong>Google Fonts:</strong> only if you choose <em>Accept all</em> in the cookie banner. Otherwise your device's own font is used.</li>
+    <li><strong>Google sign-in:</strong> only if you choose <em>Continue with Google</em>. Google confirms who you are and learns that you signed in to this site. We send Google nothing about your files or activity.</li>
     <li><strong>Authorities:</strong> only when the law requires it.</li>
   </ul>
 </section>

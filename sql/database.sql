@@ -312,3 +312,32 @@ ALTER TABLE `users`
 ALTER TABLE `user_files`
   ADD COLUMN IF NOT EXISTS `stored_size` BIGINT UNSIGNED DEFAULT NULL AFTER `file_size`,
   ADD COLUMN IF NOT EXISTS `is_compressed` TINYINT(1) NOT NULL DEFAULT 0 AFTER `stored_size`;
+
+-- ==============================================================
+-- v6: Sign in with Google (see sql/upgrade_v6_google_auth.sql)
+-- ==============================================================
+ALTER TABLE `users`
+  ADD COLUMN IF NOT EXISTS `google_sub` VARCHAR(64) DEFAULT NULL AFTER `password`,
+  ADD COLUMN IF NOT EXISTS `has_password` TINYINT(1) NOT NULL DEFAULT 1 AFTER `google_sub`,
+  ADD COLUMN IF NOT EXISTS `email_verified_at` DATETIME DEFAULT NULL AFTER `has_password`,
+  ADD UNIQUE KEY IF NOT EXISTS `uq_users_google_sub` (`google_sub`);
+
+-- ==============================================================
+-- v7: Password reset by email (see sql/upgrade_v7_password_reset.sql)
+-- ==============================================================
+CREATE TABLE IF NOT EXISTS `password_resets` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT UNSIGNED NOT NULL,
+  `token_hash` CHAR(64) NOT NULL,                  -- hex SHA-256 of the token in the emailed link
+  `ip_address` VARCHAR(45) DEFAULT NULL,           -- who asked for it
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` DATETIME NOT NULL,
+  `used_at` DATETIME DEFAULT NULL,
+  UNIQUE KEY `uq_password_resets_token` (`token_hash`),
+  KEY `idx_password_resets_user` (`user_id`, `used_at`),
+  KEY `idx_password_resets_expires` (`expires_at`),
+  CONSTRAINT `fk_password_resets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `users`
+  ADD COLUMN IF NOT EXISTS `password_changed_at` DATETIME DEFAULT NULL AFTER `email_verified_at`;

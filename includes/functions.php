@@ -759,10 +759,26 @@ function csrf_token(): string
 
 /**
  * Hidden form input containing the CSRF token.
+ * The token is masked with fresh random bytes on every page (pad + token XOR pad), so the
+ * value in the HTML is different each time. Pages are gzip-compressed, and a constant secret
+ * in compressed pages could be guessed byte by byte over HTTPS (the "BREACH" attack).
  */
 function csrf_field(): string
 {
-    return '<input type="hidden" name="csrf_token" value="' . csrf_token() . '">';
+    $token = hex2bin(csrf_token());
+    $pad = random_bytes(strlen($token));
+    return '<input type="hidden" name="csrf_token" value="' . bin2hex($pad . ($token ^ $pad)) . '">';
+}
+
+/** The real session token inside a submitted (masked) token, or '' if malformed. */
+function csrf_unmask(string $submitted): string
+{
+    if (strlen($submitted) === 128 && ctype_xdigit($submitted)) {
+        $bytes = hex2bin($submitted);
+        return bin2hex(substr($bytes, 0, 32) ^ substr($bytes, 32));
+    }
+    // Unmasked 64-character token (forms rendered before masking was added)
+    return strlen($submitted) === 64 && ctype_xdigit($submitted) ? $submitted : '';
 }
 
 /**
@@ -782,7 +798,7 @@ function csrf_valid(): bool
     }
     return isset($_POST['csrf_token'], $_SESSION['csrf_token'])
         && is_string($_POST['csrf_token'])
-        && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token']);
+        && hash_equals($_SESSION['csrf_token'], csrf_unmask($_POST['csrf_token']));
 }
 
 /**

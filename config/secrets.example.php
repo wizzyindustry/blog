@@ -26,4 +26,22 @@ return [
     'APP_URL' => '',
     // Optional. Shown on the Privacy, Terms, Cookie and FAQ pages as the contact address
     'CONTACT_EMAIL' => '',
+
+    // Optional. "Sign in with Google" - hidden until all three are filled in (see README "Google sign-in (v6)").
+    // The client secret stays on the server: it is never sent to the browser, logged or committed.
+    'GOOGLE_CLIENT_ID' => '',
+    'GOOGLE_CLIENT_SECRET' => '',
+    'GOOGLE_REDIRECT_URI' => '', // e.g. 'http://localhost/blog/account/google_callback.php'
+
+    // Email (password reset links). Leave SMTP_HOST empty in development: emails are then saved in
+    // logs/mail/ instead of being sent. On a live site ALSO set APP_URL, otherwise no reset links are sent.
+    // Gmail: SMTP_HOST smtp.gmail.com, SMTP_PORT 587, SMTP_SECURE tls, SMTP_USER your address,
+    // SMTP_PASS a Google "App password" (not your normal password).
+    'SMTP_HOST' => '',
+    'SMTP_PORT' => 587,
+    'SMTP_SECURE' => 'tls', // tls (STARTTLS, port 587) | ssl (port 465) | none (local test servers only)
+    'SMTP_USER' => '',
+    'SMTP_PASS' => '',
+    'MAIL_FROM' => '', // defaults to SMTP_USER
+    'MAIL_FROM_NAME' => 'UDOM Student Materials',
 ];

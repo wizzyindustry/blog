@@ -17,7 +17,7 @@ setcookie(CONSENT_COOKIE, $choice, [
 
 // Go back to the page the visitor was on (same site only)
 $return = (string) ($_GET['return'] ?? '');
-if ($return === '' || $return[0] !== '/' || preg_match('#^/[/\\\\]#', $return) || preg_match('/[\r\n]/', $return)) {
+if (!is_safe_local_path($return)) {
     $return = app_base_path() . '/landing.php';
 }
 header('Location: ' . $return, true, 303);

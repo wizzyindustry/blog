@@ -5629,3 +5629,176 @@ button.sidebar-link {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ---------- Sign in with Google (v6) ---------- */
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  background: #fff;
+  color: #1f1f1f;
+  border: 1px solid #c7c7c7;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-google:hover,
+.btn-google:focus-visible {
+  background: #f4f6f9;
+  border-color: #8e8e8e;
+  color: #1f1f1f;
+}
+
+.btn-google:focus-visible {
+  outline: 3px solid rgba(66, 133, 244, 0.45);
+  outline-offset: 2px;
+}
+
+.google-g {
+  flex-shrink: 0;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  color: #6b7280;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e2e6ec;
+}
+
+.google-email {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  background: #f4f6f9;
+  border-radius: 8px;
+  word-break: break-all;
+}
+
+.badge-google {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid #c7d7f5;
+  background: #eef4ff;
+  color: #1a56c4;
+  font-size: 11px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.google-email i {
+  color: #1e8e3e;
+}
+
+/* Very small phones (320-400px): the one-line brand name must not push the menu button off-screen */
+@media (max-width: 400px) {
+  .header-inner {
+    gap: 8px;
+  }
+
+  .brand-logo {
+    font-size: 16px;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .brand-logo > span:not(.brand-icon) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .brand-logo .brand-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+
+  .mobile-menu-toggle {
+    flex-shrink: 0;
+    padding: 6px;
+    margin-right: -6px;
+  }
+}
+
+/* Landing hero: let the single grid column shrink below its content's natural width on 320px screens */
+@media (max-width: 1023px) {
+  .landing-hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.landing-hero-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 400px) {
+  .landing-title {
+    font-size: 23px;
+  }
+}
+
+/* ---------- Landing page: featured FAQ ---------- */
+.landing-faq {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.landing-faq .faq-item {
+  margin-bottom: 0;
+}
+
+.landing-faq .faq-answer a {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+@media (min-width: 900px) {
+  .landing-faq {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Sign-in: "Forgot password?" next to the Password label */
+.label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.forgot-link {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* Alerts: the icon keeps its size, the message wraps as ONE block (long email addresses included) */
+.alert > i:first-child {
+  flex-shrink: 0;
+}
+
+.alert-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

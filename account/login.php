@@ -28,6 +28,7 @@ $error_msg = '';
 $login = '';
 $locked = recent_failed_logins($pdo, 'user', $ip) >= LOGIN_MAX_ATTEMPTS_PER_IP;
 $flash_success = get_flash('success');
+$flash_error = get_flash('error'); // e.g. from Google sign-in
 
 if ($locked) {
     $error_msg = 'Too many failed login attempts. Please wait ' . LOGIN_LOCK_MINUTES . ' minutes and try again.';
@@ -94,7 +95,11 @@ require __DIR__ . '/includes/auth_head.php';
 <?php endif; ?>
 <?php if ($error_msg !== ''): ?>
   <div class="alert alert-danger" role="alert"><i class="fa-solid fa-circle-exclamation"></i> <?php echo sanitize($error_msg); ?></div>
+<?php elseif ($flash_error !== ''): ?>
+  <div class="alert alert-danger" role="alert"><i class="fa-solid fa-circle-exclamation"></i> <?php echo sanitize($flash_error); ?></div>
 <?php endif; ?>
+
+<?php $google_return = app_base_path() . '/account/' . $next; require __DIR__ . '/includes/google_button.php'; ?>
 
 <form action="login.php" method="POST">
   <?php echo csrf_field(); ?>
@@ -107,7 +112,10 @@ require __DIR__ . '/includes/auth_head.php';
   </div>
 
   <div class="form-group">
-    <label for="password" class="form-label"><i class="fa-solid fa-key"></i> Password</label>
+    <div class="label-row">
+      <label for="password" class="form-label"><i class="fa-solid fa-key"></i> Password</label>
+      <a href="forgot_password.php" class="forgot-link">Forgot password?</a>
+    </div>
     <input type="password" name="password" id="password" class="form-control"
       required maxlength="255" autocomplete="current-password" <?php echo $locked ? 'disabled' : ''; ?>>
   </div>

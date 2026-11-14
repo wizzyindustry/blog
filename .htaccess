@@ -40,7 +40,8 @@ ErrorDocument 504 /blog/error.php
     RewriteRule ^llms\.txt$ llms.php [L]
 
     # ---- 2. Internal folders are never served (404, so they are not even confirmed to exist) ----
-    RewriteRule ^(config|includes|sql|logs)(/|$) - [R=404,L]
+    RewriteRule ^(config|includes|sql|logs|deploy)(/|$) - [R=404,L]
+    RewriteRule ^RELEASE\.json$ - [R=404,L]
     RewriteRule ^(admin|account)/includes(/|$) - [R=404,L]
 
     # ---- 3. Dot-files (.git, .env, .gitignore) and docs / dumps / logs ----
@@ -65,6 +66,36 @@ ErrorDocument 504 /blog/error.php
     Header always set Strict-Transport-Security "max-age=0" "expr=%{HTTPS} == 'on'"
     Header always unset X-Powered-By
     Header unset X-Powered-By
+</IfModule>
+
+# ---- Text compression (gzip): HTML, CSS, JS, JSON, XML, SVG and plain text ----
+# Needs mod_deflate AND mod_filter (both enabled in C:\xampp\apache\conf\httpd.conf).
+# style.css: 102 KB -> 17 KB. Without either module these lines are skipped (no 500 error).
+<IfModule mod_deflate.c>
+    <IfModule mod_filter.c>
+        AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml text/markdown
+        AddOutputFilterByType DEFLATE text/javascript application/javascript application/x-javascript
+        AddOutputFilterByType DEFLATE application/json application/xml application/rss+xml application/manifest+json
+        AddOutputFilterByType DEFLATE image/svg+xml image/x-icon image/vnd.microsoft.icon
+    </IfModule>
+    # File downloads stream exact bytes and support resuming (Range): never re-compress them
+    SetEnvIfNoCase Request_URI "/(account/file|download)\.php$" no-gzip dont-vary
+</IfModule>
+
+# ---- Browser caching for static files (PHP pages are never cached: they send no-store) ----
+<IfModule mod_headers.c>
+    # CSS / JS are linked as style.css?v=<last-modified>: a new version gets a new URL, so cache for a year
+    <FilesMatch "\.(css|js|mjs|woff2?|ttf|otf|eot)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    # Post images and avatars get a new random file name when replaced: 30 days
+    <FilesMatch "\.(jpe?g|png|gif|webp|avif|svg|bmp)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+    # Favicons and the web manifest keep their names: 1 week
+    <FilesMatch "\.(ico|webmanifest)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
 </IfModule>
 
 # PHP: never display errors to visitors (also enforced in includes/security.php)

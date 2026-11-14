@@ -288,6 +288,11 @@ function current_user(bool $refresh = false): ?array
         if (!$user || $user['status'] !== 'active') {
             log_out_user();
             $user = null;
+        } elseif (!empty($user['password_changed_at'])
+            && strtotime($user['password_changed_at']) > (int) ($_SESSION['user_login_at'] ?? 0)) {
+            // The password was changed or reset after this device signed in: sign it out
+            log_out_user();
+            $user = null;
         }
     }
     return $user;
@@ -321,6 +326,7 @@ function log_in_user(PDO $pdo, array $user): void
     $_SESSION['user_id'] = (int) $user['id'];
     $_SESSION['user_username'] = $user['username'];
     $_SESSION['user_seen_at'] = time();
+    $_SESSION['user_login_at'] = time(); // Compared with users.password_changed_at
     unset($_SESSION['csrf_token']);
     csrf_token();
 

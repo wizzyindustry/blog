@@ -82,6 +82,8 @@ require __DIR__ . '/includes/auth_head.php';
   <div class="alert alert-danger" role="alert"><i class="fa-solid fa-circle-exclamation"></i> Please fix the highlighted fields.</div>
 <?php endif; ?>
 
+<?php require __DIR__ . '/includes/google_button.php'; ?>
+
 <form action="register.php" method="POST">
   <?php echo csrf_field(); ?>
   <div class="hp-field" aria-hidden="true">

@@ -136,7 +136,7 @@ function send_security_headers(): void
         "connect-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
-        "form-action 'self'",
+        "form-action 'self' https://accounts.google.com", // Google sign-in redirect after the Connect form
         "frame-ancestors 'self'",
     ];
     if (is_https() && https_required()) {
@@ -195,6 +195,17 @@ function rate_hit(string $scope, string $who): void
     } catch (PDOException $e) {
         error_log('rate_hit: ' . $e->getMessage());
     }
+}
+
+/**
+ * True for a path on THIS site ("/blog/account/files.php?x=1"), false for anything that could
+ * send the visitor elsewhere ("//evil.example", "/\evil", "https://...", header injection).
+ * Used for every "go back to where you were" redirect.
+ */
+function is_safe_local_path(string $path): bool
+{
+    return $path !== '' && strlen($path) <= 500 && $path[0] === '/'
+        && !preg_match('#^/[/\\\\]#', $path) && !preg_match('/[\x00-\x1f\x7f]/', $path);
 }
 
 /** Stop with HTTP 429 "Too Many Requests". */

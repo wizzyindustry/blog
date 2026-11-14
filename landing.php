@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/faq_data.php';
 
 $active_nav = 'landing';
 $page_title = 'Welcome';
@@ -202,8 +203,35 @@ require_once __DIR__ . '/includes/header.php';
     </div>
   </section>
 
+  <!-- Frequently asked questions (the featured ones; all of them are on faq.php) -->
+  <?php $landing_faq = faq_featured(); ?>
+  <?php if ($landing_faq): ?>
+  <section class="landing-section" id="faq">
+    <div class="container">
+      <div class="landing-section-head landing-section-head-row">
+        <div>
+          <h2 class="landing-section-title">Frequently asked questions</h2>
+          <p class="text-muted">Quick answers before you start.</p>
+        </div>
+        <a href="faq.php" class="btn btn-outline btn-sm">
+          All questions <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+
+      <div class="landing-faq">
+        <?php foreach ($landing_faq as [$q, $a]): ?>
+          <details class="faq-item">
+            <summary><span><?php echo sanitize($q); ?></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary>
+            <div class="faq-answer"><p><?php echo $a; // Trusted, written in includes/faq_data.php ?></p></div>
+          </details>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </section>
+  <?php endif; ?>
+
   <!-- Call to action -->
-  <section class="landing-section">
+  <section class="landing-section landing-section-alt">
     <div class="container">
       <div class="landing-cta">
         <div>

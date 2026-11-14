@@ -10,9 +10,19 @@ function app_base_path(): string
 {
     static $base = null;
     if ($base === null) {
-        $root = str_replace('\\', '/', (string) realpath($_SERVER['DOCUMENT_ROOT'] ?? ''));
         $project = str_replace('\\', '/', (string) realpath(__DIR__ . '/..'));
-        $base = ($root !== '' && stripos($project, $root) === 0) ? substr($project, strlen($root)) : '';
+        // Served through an Apache Alias (e.g. blue-green releases outside htdocs): Apache tells us the
+        // URL prefix (CONTEXT_PREFIX) and the folder it maps to (CONTEXT_DOCUMENT_ROOT)
+        $ctx_root = str_replace('\\', '/', (string) realpath($_SERVER['CONTEXT_DOCUMENT_ROOT'] ?? ''));
+        $ctx_prefix = (string) ($_SERVER['CONTEXT_PREFIX'] ?? '');
+        if ($ctx_prefix !== '' && $ctx_root !== '' && stripos($project, $ctx_root) === 0) {
+            $root = $ctx_root;
+            $project = rtrim($ctx_prefix, '/') . '/' . ltrim(substr($project, strlen($ctx_root)), '/');
+        } else {
+            $root = str_replace('\\', '/', (string) realpath($_SERVER['DOCUMENT_ROOT'] ?? ''));
+            $project = $root !== '' && stripos($project, $root) === 0 ? substr($project, strlen($root)) : '';
+        }
+        $base = $project;
         $base = '/' . trim($base, '/');
         $base = $base === '/' ? '' : $base;
     }
@@ -85,7 +95,7 @@ function render_error_page(int $code, ?string $title = null, ?string $message = 
         . '<meta name="description" content="' . $e($message) . '">'
         . '<link rel="icon" href="' . $base . '/favicon.ico" sizes="32x32"><link rel="icon" href="' . $base . '/assets/img/favicon.svg" type="image/svg+xml">'
         . '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">'
-        . '<link rel="stylesheet" href="' . $base . '/assets/css/style.css">'
+        . '<link rel="stylesheet" href="' . $base . '/assets/css/style.css?v=' . (int) @filemtime(__DIR__ . '/../assets/css/style.css') . '">'
         . '</head><body class="error-body">'
         . '<header class="error-header"><a href="' . $base . '/landing.php" class="brand-logo">'
         . '<span class="brand-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>UDOM Student Materials</span></a></header>'

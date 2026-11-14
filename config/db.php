@@ -52,3 +52,10 @@ require_once __DIR__ . '/../includes/comments.php';
 
 // <head> tags: meta description, social cards, favicons, consent-aware fonts.
 require_once __DIR__ . '/../includes/seo.php';
+
+// Sign in with Google (switched off until GOOGLE_* settings are filled in).
+require_once __DIR__ . '/../includes/google_auth.php';
+
+// Outgoing email (SMTP, or saved to logs/mail/ in development) and password reset links.
+require_once __DIR__ . '/../includes/mailer.php';
+require_once __DIR__ . '/../includes/password_reset.php';

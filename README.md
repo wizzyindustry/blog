@@ -161,6 +161,247 @@ sql/database.sql              Full schema and sample data for phpMyAdmin
 - **UX:** an eye button shows or hides any password, and destructive actions open a confirmation
   dialog instead of the browser's `confirm()` box.
 
+## Password reset by email (v7)
+
+**1. Upgrade the database.** Import `sql/upgrade_v7_password_reset.sql` as `root` (safe to run twice).
+
+**2. Set up email** in `config/secrets.php`:
+
+```php
+'APP_URL'     => 'http://localhost/blog',   // REQUIRED on a live site: links in emails use it
+'SMTP_HOST'   => 'smtp.gmail.com',
+'SMTP_PORT'   => 587,
+'SMTP_SECURE' => 'tls',                     // tls (587) | ssl (465)
+'SMTP_USER'   => 'your.address@gmail.com',
+'SMTP_PASS'   => 'xxxx xxxx xxxx xxxx',     // Gmail: an "App password", not your normal password
+'MAIL_FROM'   => '',                        // defaults to SMTP_USER
+```
+
+**Brevo (recommended; used by this site).** It's free for 300 emails a day and less likely to
+land in spam than Gmail.
+
+| Setting | Value |
+|---|---|
+| `SMTP_HOST` | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_SECURE` | `tls` |
+| `SMTP_USER` | the "Login" from **SMTP & API → SMTP** (looks like `...@smtp-brevo.com`) |
+| `SMTP_PASS` | an SMTP key generated on the same page (`xsmtpsib-...`) |
+| `MAIL_FROM` | a sender address confirmed under **Senders** |
+
+**If the log says `525 Unauthorized IP address`**, the settings are fine. Allow the server's IP
+address in Brevo: your name → **Security → Authorized IPs**. Home internet addresses can change,
+so check this first if emails stop.
+
+Email is sent **after** the page is delivered, so a slow mail server never slows pages down.
+"Forgot password" also answers in the same time whether or not an account exists.
+
+For Gmail:
+1. Turn on 2-Step Verification for the account.
+2. Go to Google Account → Security → **App passwords**.
+3. Create one and paste it as `SMTP_PASS`.
+
+**While `SMTP_HOST` is empty (development), no email is sent.** Each message is saved as an `.eml`
+file in `logs/mail/`, which can't be opened from the web, so you can copy the link from it.
+
+**How it works**
+
+- **Requesting a link:** *Sign in → Forgot password?* emails a link that works **once** and
+  **expires after 30 minutes**. Asking again cancels the older link.
+- **Using the link:** `account/reset_password.php` checks the link, then reloads without the token
+  in the address bar, so it doesn't stay in browser history.
+- **After the reset:**
+  - Every other signed-in device is signed out (`users.password_changed_at`).
+  - A "your password was changed" email is sent.
+  - The account's sign-in lock is cleared.
+- **No account discovery:** unknown emails get exactly the same message, after the same ~2-second
+  wait.
+- **Tokens:** only a SHA-256 hash of each token is stored.
+- **Limits:**
+  - 5 requests per network per 15 minutes.
+  - 3 emails per account per hour.
+  - 20 wrong links per 15 minutes.
+- **Forged links blocked:** links are built from `APP_URL` (or `localhost`), never from the
+  request's `Host` header. Without `APP_URL`, a live site sends **no** reset emails. The reason
+  is written to `logs/php-errors.log`.
+- **Changing a password while signed in** (Password & Security) also signs out other devices and
+  sends the notification email.
+
+## Blue-green deployment (instant rollback)
+
+`deploy/deploy.ps1` keeps **two complete copies** of the site and switches Apache between them:
+
+```
+C:\xampp\deploy\blog\
+  releases\blue\    releases\green\     <- two versions of the code; /blog serves ONE of them
+  shared\uploads  shared\logs  shared\config\secrets.php   <- shared by both, never copied or lost
+  backups\db_*.sql                      <- database backup taken before every switch
+  apache-blog.conf  state.json  deploy.log
+```
+
+**One-time setup** (PowerShell **as Administrator**, in the project folder):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1 install
+```
+
+Then restart Apache **once** (XAMPP Control Panel: Stop, Start). Install:
+- copies `uploads`, `logs` and `secrets.php` into `shared\`;
+- adds one `IncludeOptional` line to `httpd.conf`, after taking a backup of it.
+
+`/blog` keeps working from `htdocs\blog` until the first deploy.
+
+**Every release** (as Administrator):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1 deploy
+```
+
+1. Copies the code into the **idle** colour. The live site is not touched.
+2. Runs `php -l` on every PHP file.
+3. Tests the idle colour through its private preview address (`/blog-blue` or `/blog-green`, this
+   computer only). It checks `health.php` and 10 key pages for HTTP 200 with no PHP errors, that a
+   missing page gives 404, and that `secrets.php` can't be opened.
+4. Backs up the database (keeps the last 10 backups).
+5. Points `/blog` at the new colour and restarts Apache gracefully, so requests in progress finish.
+6. Watches the live site for 30 seconds. If it fails twice in a row, it **switches back
+   automatically**.
+
+If step 2 or 3 fails, the new version **never goes live**.
+
+**When something is wrong after a release:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1 rollback   # back to the previous colour, seconds
+powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1 switch     # flip to the other colour (checked first)
+powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1 status     # what is live, both versions, history
+```
+
+**Notes**
+
+- **Once blue-green is installed, the live site's settings are in
+  `C:\xampp\deploy\blog\shared\config\secrets.php`**, not in `htdocs\blog\config\secrets.php`.
+  - Edit that shared file for live changes (SMTP, Google, `APP_URL`...). Changes apply at once,
+    with no deploy needed, because each release's `config\secrets.php` just loads it.
+  - `deploy` warns when the development copy has settings the live file is missing.
+- **Sessions and uploads are shared**, so students stay signed in and keep their files across
+  switches and rollbacks.
+- **Preview addresses** (this computer only):
+  - `/blog-blue` and `/blog-green` show each version.
+  - `/blog-dev` shows the development copy in `htdocs\blog`.
+- **Database changes** are shared by both colours, so make them **backward compatible**: add new
+  columns and tables first, and remove old ones only in a later release. Both upgrade scripts in
+  `sql/` already follow this rule.
+- **Restoring a database backup** is manual, because it discards newer data:
+  `mysql -u root udom_blog < C:\xampp\deploy\blog\backups\db_....sql`
+- **Useful options:**
+  - `-NoSwitch` prepares and tests the idle colour without going live; `switch` puts it live later.
+  - `-WatchSeconds 60` watches the live site for longer.
+  - `-DbPassword ...` is needed once MySQL `root` has a password.
+- **`health.php`** returns `200 {"status":"ok"}` or `503`. It can also be used by an uptime monitor.
+  Only this computer sees the details and which colour is live.
+
+## Performance settings (server)
+
+These live outside the project folder, so repeat them on every machine or server:
+
+- **Text compression (gzip):** in `C:\xampp\apache\conf\httpd.conf`, remove the `#` in front of
+  `LoadModule deflate_module ...` **and** `LoadModule filter_module ...`. `.htaccess` then compresses
+  HTML, CSS, JS, JSON, XML and SVG; for example `style.css` drops from 102 KB to 18 KB. File
+  downloads (`account/file.php`, `download.php`) are never re-compressed.
+- **OPcache:** in `C:\xampp\php\php.ini`, set `zend_extension=opcache`, `opcache.enable=1`,
+  `opcache.memory_consumption=128`, `opcache.interned_strings_buffer=16`,
+  `opcache.max_accelerated_files=10000`, `opcache.validate_timestamps=1` and
+  `opcache.revalidate_freq=2`. Code edits still show up within 2 seconds.
+- **Browser caching** is set in `.htaccess`, with no server change needed:
+  - CSS and JS are cached for 1 year. They are linked as `style.css?v=<last-modified>`, so an edited
+    file is downloaded again straight away.
+  - Images are cached for 30 days. Uploads get a new random name when replaced.
+  - Favicons and the web manifest are cached for 1 week.
+  - PHP pages are never cached.
+- **Restart Apache completely** after changing `httpd.conf` or `php.ini`: in the XAMPP Control
+  Panel, click **Stop**, then **Start**. A graceful restart does not load new modules.
+- Pages are gzip-compressed, so CSRF tokens are masked with fresh random bytes on every page. This
+  stops the "BREACH" attack, which could otherwise guess a token from compressed HTTPS responses.
+
+## Google sign-in (v6)
+
+Students can sign up and sign in with **Continue with Google**. Username/password sign-in keeps
+working. The button stays hidden until the three `GOOGLE_*` settings are filled in.
+
+**1. Upgrade the database.** Import `sql/upgrade_v6_google_auth.sql` as `root` (safe to run twice).
+It adds `users.google_sub`, `users.has_password` and `users.email_verified_at`.
+
+**2. Create the OAuth client** in [Google Cloud Console](https://console.cloud.google.com/):
+
+1. Create (or pick) a project.
+2. **Google Auth Platform → Branding** (older consoles: *APIs & Services → OAuth consent screen*):
+   - App name `UDOM Student Materials`, a support email, and your contact email.
+   - Audience: **External**. While the app is in *Testing*, add the Google accounts that may sign
+     in under *Test users*. Choose **Publish app** when you go live.
+   - Data access / scopes: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`.
+     These are non-sensitive, so no Google verification review is needed.
+3. **Clients** (older consoles: *APIs & Services → Credentials → Create credentials → OAuth client ID*):
+   - Application type: **Web application**.
+   - Authorized redirect URI: `http://localhost/blog/account/google_callback.php`
+   - Leave *Authorized JavaScript origins* empty (the site uses no Google JavaScript).
+4. Copy the **Client ID** and **Client secret**.
+
+**3. Fill in `config/secrets.php`** (never commit this file):
+
+```php
+'GOOGLE_CLIENT_ID' => '1234567890-abc.apps.googleusercontent.com',
+'GOOGLE_CLIENT_SECRET' => 'GOCSPX-...',
+'GOOGLE_REDIRECT_URI' => 'http://localhost/blog/account/google_callback.php',
+```
+
+The redirect URI must match the one in Google Cloud **exactly** (scheme, host, folder, no trailing slash).
+
+**How it works**
+
+- **Pages:** `account/google_start.php` → Google → `account/google_callback.php` →
+  `account/google_finish.php` (first sign-in only: confirm name and username, accept the Terms).
+  The code is in `includes/google_auth.php`.
+- **Checks:**
+  - `state` blocks forged sign-ins and works only once; `nonce` blocks token replay; PKCE (S256)
+    makes a stolen code useless.
+  - The ID token's RS256 signature is verified locally against Google's public keys. The keys are
+    cached in `logs/google_jwks.json`.
+  - `iss`, `aud`, `exp`/`iat` and `nonce` must all match, and `email_verified` must be true.
+- **Strict `state` check** (`google_check_callback_state()`), run FIRST on every callback,
+  including "cancelled" and error replies. A callback is rejected with 400 unless:
+  - this browser session started the sign-in;
+  - there is exactly **one** `state` parameter;
+  - it is in the exact generated format (43 base64url characters);
+  - it matches in a constant-time comparison;
+  - it is under 10 minutes old and used only once;
+  - the request is a GET;
+  - `code` and `error` are not both present;
+  - `iss`, if sent, is Google (RFC 9207);
+  - for Connect, the same student is still signed in.
+
+  Rejections are logged with a reference (never the values). After 10 rejections from one network
+  in 15 minutes, the callback answers 429. The callback page sends `Referrer-Policy: no-referrer`.
+- **What is stored:** only Google's account ID (`google_sub`). Access tokens are thrown away and
+  never stored or logged.
+- **Same email, existing account:** it is **not** linked automatically, because that could let
+  someone take over the account. The owner signs in with their password and chooses
+  **Password & Security → Connect Google**.
+- **Google-only accounts** have no password. They can *set* one under Password & Security. They
+  cannot disconnect Google until they do, so they never lock themselves out.
+- **Admin:** the admin panel stays password-only. Linked accounts show a *Google* badge in
+  *Admin → Users*.
+- **Rate limit:** sign-in starts are limited per IP (`google` scope, 20 per 15 minutes).
+
+**Going live**
+
+- Switch to HTTPS first: in `secrets.php` set `FORCE_HTTP => false`, `FORCE_HTTPS => true`, and see
+  `.htaccess`. Google only accepts `http://` redirect URIs for `localhost`.
+- In Google Cloud, add `https://YOUR-DOMAIN/account/google_callback.php` (adjust the folder) and
+  update `GOOGLE_REDIRECT_URI` to match.
+- Publish the app on the Branding / consent screen page so that any Google account can sign in, not
+  only test users.
+
 ## Comment Replies (v4)
 
 - **Upgrading:** import `sql/upgrade_v4_comment_replies.sql` as `root` (safe to run twice).

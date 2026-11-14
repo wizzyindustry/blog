@@ -52,7 +52,7 @@ $total_pages = max(1, (int) ceil($total / ADMIN_ROWS_PER_PAGE));
 $page = min(current_page_number(), $total_pages);
 
 $stmt = $pdo->prepare(
-    'SELECT id, full_name, username, email, avatar, status, file_count, storage_used, last_seen_at, created_at
+    'SELECT id, full_name, username, email, avatar, status, google_sub, file_count, storage_used, last_seen_at, created_at
      FROM users' . $where_sql . ' ORDER BY ' . $sorts[$sort][1] . ' LIMIT :limit OFFSET :offset'
 );
 foreach ($params as $k => $v) {
@@ -134,6 +134,9 @@ require_once __DIR__ . '/includes/admin_header.php';
                     <span>
                       <strong><?php echo sanitize($u['full_name']); ?></strong>
                       <span class="text-muted">@<?php echo sanitize($u['username']); ?></span>
+                      <?php if (!empty($u['google_sub'])): ?>
+                        <span class="badge-google" title="Can sign in with Google"><i class="fa-brands fa-google"></i> Google</span>
+                      <?php endif; ?>
                     </span>
                   </a>
                 </td>
