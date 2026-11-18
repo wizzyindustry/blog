@@ -6,6 +6,9 @@ Vanilla PHP (PDO), MySQL, HTML5, CSS3, Vanilla JavaScript and Font Awesome 6.
 All posts, comments and admin accounts are stored in MySQL, so data persists across refreshes,
 browser restarts and server restarts.
 
+> **Going live on InfinityFree:** see [DEPLOY_INFINITYFREE.md](DEPLOY_INFINITYFREE.md). Build the
+> upload package with `php deploy/build_infinityfree.php --app-url=https://your-site`.
+
 ---
 
 ## XAMPP Setup (step by step)

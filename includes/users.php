@@ -107,7 +107,7 @@ function avatars_dir(): string
 /** Largest single file the server will actually accept (php.ini can be lower than our setting). */
 function user_max_file_bytes(): int
 {
-    $limits = [USER_MAX_FILE_BYTES];
+    $limits = [USER_MAX_FILE_BYTES, host_max_upload_bytes()];
     foreach (['upload_max_filesize', 'post_max_size'] as $key) {
         $value = ini_bytes($key);
         if ($value > 0) {
@@ -204,7 +204,7 @@ function user_is_online(?string $last_seen): bool
 
 function client_ip(): string
 {
-    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    return client_ip_address(); // REMOTE_ADDR, or a trusted proxy header (see includes/security.php)
 }
 
 /** Failed logins from this IP in the lock window, for 'admin' or 'user'. */

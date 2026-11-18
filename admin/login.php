@@ -18,6 +18,9 @@
  */
 require_once __DIR__ . '/../config/db.php';
 
+// Who may open the admin panel at all (ADMIN_ACCESS in config/secrets.php; default: this computer only)
+enforce_admin_access();
+
 start_session();
 
 // Already logged in: go straight to the dashboard
@@ -34,7 +37,7 @@ const LOGIN_WINDOW_MINUTES = LOGIN_LOCK_MINUTES;
 // password_verify() still runs and response time does not reveal valid usernames.
 const DUMMY_PASSWORD_HASH = '$2y$10$vEGjxeVLC.Mcw6lFwgSv0eTmngPJWNsORMmSM6TCMURmLwckJu5mu';
 
-$client_ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+$client_ip = client_ip_address();
 $error_msg = '';
 $username = '';
 $locked = recent_failed_logins($pdo, 'admin', $client_ip) >= LOGIN_MAX_ATTEMPTS;

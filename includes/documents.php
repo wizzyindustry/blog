@@ -33,6 +33,12 @@ const DOCUMENT_TYPES = [
 const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024; // 20 MB per document
 const MAX_ATTACHMENTS_PER_POST = 10;
 
+/** Largest document an admin may attach: 20 MB, or less when the host limits files (MAX_UPLOAD_MB). */
+function document_max_bytes(): int
+{
+    return min(MAX_DOCUMENT_BYTES, host_max_upload_bytes());
+}
+
 // Limits that protect the server while building previews
 const PREVIEW_MAX_XML_BYTES = 30 * 1024 * 1024;  // Largest XML part we will unpack
 const PREVIEW_MAX_IMAGE_BYTES = 3 * 1024 * 1024; // Largest single embedded image
@@ -208,8 +214,8 @@ function handle_document_uploads(string $field, int $slots, array &$errors): arr
             break;
         }
         if (in_array($f['error'][$i], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)
-            || $f['size'][$i] > MAX_DOCUMENT_BYTES) {
-            $errors[] = $label . ' is too large. Maximum size is ' . format_bytes(MAX_DOCUMENT_BYTES) . '.';
+            || $f['size'][$i] > document_max_bytes()) {
+            $errors[] = $label . ' is too large. Maximum size is ' . format_bytes(document_max_bytes()) . '.';
             continue;
         }
         if ($f['error'][$i] !== UPLOAD_ERR_OK) {

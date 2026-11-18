@@ -5,6 +5,9 @@
  */
 require_once __DIR__ . '/../config/db.php';
 
+// Who may open the admin panel at all (ADMIN_ACCESS in config/secrets.php; default: this computer only)
+enforce_admin_access();
+
 start_session();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_valid()) {

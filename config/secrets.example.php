@@ -44,4 +44,15 @@ return [
     'SMTP_PASS' => '',
     'MAIL_FROM' => '', // defaults to SMTP_USER
     'MAIL_FROM_NAME' => 'UDOM Student Materials',
+
+    // Hosting (see DEPLOY_INFINITYFREE.md). Defaults suit this XAMPP computer.
+    // Who may open /admin: 'local' (this computer), 'any' (anyone with the admin password),
+    // or IP addresses / ranges: '41.59.10.20, 197.250.0.0/16'
+    'ADMIN_ACCESS' => 'local',
+    // Largest upload the HOST accepts, in MB (InfinityFree: 10). 0 = no extra limit.
+    'MAX_UPLOAD_MB' => 0,
+    // Behind a host's HTTPS proxy (InfinityFree): trust X-Forwarded-Proto. Never true on a plain server.
+    'TRUST_PROXY_HTTPS' => false,
+    // Only if every visitor shows the SAME IP address: 'HTTP_X_FORWARDED_FOR' or 'HTTP_X_REAL_IP'
+    'TRUST_PROXY_IP_HEADER' => '',
 ];

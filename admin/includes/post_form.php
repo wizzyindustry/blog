@@ -159,7 +159,7 @@ $field_error = function (string $field) use ($field_errors): string {
     <p class="text-muted ratio-help">
       Attach PDF, Word (DOC, DOCX) or PowerPoint (PPT, PPTX) files. Visitors can view them in the browser
       or download them. Up to <?php echo MAX_ATTACHMENTS_PER_POST; ?> files per post,
-      <?php echo format_bytes(MAX_DOCUMENT_BYTES); ?> each, and <?php echo format_bytes(ini_bytes('post_max_size')); ?>
+      <?php echo format_bytes(document_max_bytes()); ?> each, and <?php echo format_bytes(ini_bytes('post_max_size')); ?>
       in total per save.
     </p>
 
@@ -198,7 +198,7 @@ $field_error = function (string $field) use ($field_errors): string {
     <input type="file" name="documents[]" id="documents-upload" class="visually-hidden" multiple
       accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
       data-max-files="<?php echo MAX_ATTACHMENTS_PER_POST - count($existing_attachments); ?>"
-      data-max-bytes="<?php echo MAX_DOCUMENT_BYTES; ?>">
+      data-max-bytes="<?php echo document_max_bytes(); ?>">
     <ul class="selected-files" id="selected-files" aria-live="polite"></ul>
     <?php echo $field_error('documents'); ?>
   </fieldset>

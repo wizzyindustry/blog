@@ -1,14 +1,13 @@
 # ------------------------------------------------------------------
-# Admin area lock: only reachable from THIS computer (localhost).
-# Everyone else gets "403 Forbidden" before any PHP code runs.
+# Admin area
 #
-# To manage the site from another trusted device, add its IP address, e.g.:
-#   Require ip 192.168.1.25
-# (one line per address, inside the RequireAny block below)
+# WHO may open it is decided in PHP (enforce_admin_access() in includes/security.php),
+# so the same rule works on XAMPP and on shared hosting:
+#   ADMIN_ACCESS => 'local'   only this computer (default)
+#   ADMIN_ACCESS => 'any'     anyone with the admin password (live hosting)
+#   ADMIN_ACCESS => '41.59.10.20, 197.250.0.0/16'   only these addresses
+# Everyone else gets "404 Not Found" before any admin page runs.
 # ------------------------------------------------------------------
-<RequireAny>
-    Require local
-</RequireAny>
 
 # Never cache admin pages or show them in search engines
 <IfModule mod_headers.c>

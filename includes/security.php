@@ -79,8 +79,89 @@ register_shutdown_function(function () {
 
 function is_https(): bool
 {
-    return (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
-        || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
+    if ((!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443) {
+        return true;
+    }
+    // Hosts that end HTTPS at a front proxy: trust X-Forwarded-Proto ONLY when the setting says so
+    // (otherwise any visitor could send the header). TRUST_PROXY_HTTPS => true in secrets.php.
+    return filter_var(app_config('TRUST_PROXY_HTTPS', false), FILTER_VALIDATE_BOOLEAN)
+        && strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+}
+
+/**
+ * Largest single file the HOST allows (MAX_UPLOAD_MB in secrets.php, e.g. 10 on InfinityFree,
+ * where bigger files are silently deleted). 0 / not set = no extra limit.
+ */
+function host_max_upload_bytes(): int
+{
+    $mb = (float) app_config('MAX_UPLOAD_MB', 0);
+    return $mb > 0 ? (int) ($mb * 1024 * 1024) : PHP_INT_MAX;
+}
+
+/**
+ * Who may open the admin panel (checked in PHP, so it works on any host):
+ *   ADMIN_ACCESS => 'local'  only this computer (default: the XAMPP setup)
+ *   ADMIN_ACCESS => 'any'    anyone who has the admin password (rate-limited, strong password forced)
+ *   ADMIN_ACCESS => '41.59.10.20, 197.250.0.0/16'   only these IP addresses / IPv4 ranges
+ */
+function admin_access_allowed(): bool
+{
+    $rule = trim((string) app_config('ADMIN_ACCESS', 'local'));
+    $ip = client_ip_address();
+    if ($rule === 'any') {
+        return true;
+    }
+    if ($rule === '' || $rule === 'local') {
+        return in_array($ip, ['127.0.0.1', '::1'], true);
+    }
+    foreach (preg_split('/[\s,]+/', $rule, -1, PREG_SPLIT_NO_EMPTY) as $allowed) {
+        if (strpos($allowed, '/') !== false) {
+            [$net, $bits] = explode('/', $allowed, 2);
+            $bits = (int) $bits;
+            $ip_long = ip2long($ip);
+            $net_long = ip2long($net);
+            if ($ip_long !== false && $net_long !== false && $bits >= 0 && $bits <= 32) {
+                $mask = $bits === 0 ? 0 : (~0 << (32 - $bits)) & 0xFFFFFFFF;
+                if (($ip_long & $mask) === ($net_long & $mask)) {
+                    return true;
+                }
+            }
+        } elseif ($ip === $allowed) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Stop here with a 404 (the admin panel is not even confirmed to exist) unless admin_access_allowed(). */
+function enforce_admin_access(): void
+{
+    if (!admin_access_allowed()) {
+        error_log('Admin panel request refused for ' . client_ip_address() . ' (ADMIN_ACCESS)');
+        render_error_page(404);
+    }
+}
+
+/**
+ * The visitor's IP address. Normally REMOTE_ADDR. Behind a host's front proxy every visitor can
+ * appear with the proxy's address, which would make rate limits hit everyone at once; then set
+ * TRUST_PROXY_IP_HEADER => 'HTTP_X_FORWARDED_FOR' (or 'HTTP_X_REAL_IP') in secrets.php.
+ */
+function client_ip_address(): string
+{
+    $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+    $header = trim((string) app_config('TRUST_PROXY_IP_HEADER', ''));
+    if ($header !== '' && preg_match('/^HTTP_[A-Z0-9_]+$/', $header) && !empty($_SERVER[$header])) {
+        // X-Forwarded-For can be a list "client, proxy1, proxy2": the first valid address is the visitor
+        foreach (explode(',', (string) $_SERVER[$header]) as $candidate) {
+            $candidate = trim($candidate);
+            if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                return $candidate;
+            }
+        }
+    }
+    return $remote;
 }
 
 /** True when config says HTTPS must be used (live site). */
