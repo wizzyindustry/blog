@@ -1,5 +1,5 @@
       <div class="auth-back">
-        <a href="../landing.php"><i class="fa-solid fa-arrow-left"></i> Return to Website</a>
+        <a href="../"><i class="fa-solid fa-arrow-left"></i> Return to Website</a>
       </div>
       <nav class="auth-legal" aria-label="Legal">
         <a href="../privacy.php">Privacy</a> &middot; <a href="../terms.php">Terms</a> &middot;

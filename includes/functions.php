@@ -330,7 +330,7 @@ function clean_post_html(?string $html): string
 }
 
 /* --------------------------------------------------------------
- * Posts query (shared by index.php and search-api.php)
+ * Posts query (shared by materials.php and search-api.php)
  * ------------------------------------------------------------ */
 
 /**
@@ -437,14 +437,14 @@ function render_posts_grid(array $posts): string
         <div class="empty-icon"><i class="fa-solid fa-book-open-reader"></i></div>
         <h3 class="empty-title">No Materials Found</h3>
         <p class="empty-desc">No posts match your search or category. Try a different keyword.</p>
-        <a href="index.php" class="btn btn-primary btn-sm"><i class="fa-solid fa-rotate-left"></i> View All Posts</a>
+        <a href="materials.php" class="btn btn-primary btn-sm"><i class="fa-solid fa-rotate-left"></i> View All Posts</a>
       </div>';
     }
     return implode('', array_map('render_post_card', $posts));
 }
 
 /**
- * Build an index.php URL for the given search state.
+ * Build a materials.php URL for the given search state.
  */
 function home_url(string $search, string $category, int $page = 1): string
 {
@@ -458,7 +458,7 @@ function home_url(string $search, string $category, int $page = 1): string
     if ($page > 1) {
         $args['page'] = $page;
     }
-    return 'index.php' . ($args ? '?' . http_build_query($args) : '');
+    return 'materials.php' . ($args ? '?' . http_build_query($args) : '');
 }
 
 /**
@@ -517,7 +517,7 @@ function render_results_summary(int $total, string $search, string $category): s
     if ($category !== '') {
         $html .= ' in <strong>' . sanitize($category) . '</strong>';
     }
-    return $html . ' &bull; <a href="index.php" class="text-muted"><i class="fa-solid fa-xmark"></i> Clear filters</a>';
+    return $html . ' &bull; <a href="materials.php" class="text-muted"><i class="fa-solid fa-xmark"></i> Clear filters</a>';
 }
 
 /* --------------------------------------------------------------

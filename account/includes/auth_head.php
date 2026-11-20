@@ -23,7 +23,7 @@
 
   <div class="login-card<?php echo !empty($auth_wide) ? ' login-card-wide' : ''; ?>">
     <div class="login-header">
-      <a href="../landing.php" class="brand-icon" style="margin: 0 auto 12px auto;" aria-label="UDOM Student Materials home">
+      <a href="../" class="brand-icon" style="margin: 0 auto 12px auto;" aria-label="UDOM Student Materials home">
         <i class="fa-solid fa-graduation-cap"></i>
       </a>
       <h1><?php echo sanitize($auth_title); ?></h1>

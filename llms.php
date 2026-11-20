@@ -18,14 +18,14 @@ echo "The site is for students of the University of Dodoma (UDOM), Tanzania. Con
     . "Private student files, accounts and the admin area are not public and must not be accessed.\n\n";
 
 echo "## Main pages\n\n";
-echo $line('Home', 'landing.php', 'what the site offers and the latest materials');
-echo $line('Study materials', 'index.php', 'searchable list of all posts, filterable by category');
+echo $line('Home', '', 'what the site offers and the latest materials');
+echo $line('Study materials', 'materials.php', 'searchable list of all posts, filterable by category');
 echo $line('Shared by students', 'shared.php', 'files students made public (PDF, Word, PowerPoint, images, more)');
 echo $line('FAQ', 'faq.php', 'accounts, uploads, comments, privacy');
 echo "\n## Categories\n\n";
 foreach (get_categories() as $cat) {
     if ((int) $cat['post_count'] > 0) {
-        echo $line($cat['name'], 'index.php?category=' . rawurlencode($cat['name']), meta_excerpt($cat['description'] ?: ($cat['post_count'] . ' posts'), 120));
+        echo $line($cat['name'], 'materials.php?category=' . rawurlencode($cat['name']), meta_excerpt($cat['description'] ?: ($cat['post_count'] . ' posts'), 120));
     }
 }
 echo "\n## Latest study materials\n\n";

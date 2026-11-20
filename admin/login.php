@@ -187,7 +187,7 @@ if ($locked) {
       </form>
 
       <div style="text-align: center;">
-        <a href="../landing.php" style="font-size: 14px; font-weight: 500;">
+        <a href="../" style="font-size: 14px; font-weight: 500;">
           <i class="fa-solid fa-arrow-left"></i> Return to Website
         </a>
       </div>

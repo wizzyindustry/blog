@@ -51,7 +51,7 @@ require_once __DIR__ . '/includes/header.php';
 
     <!-- Breadcrumb -->
     <nav class="breadcrumb-nav" aria-label="Breadcrumbs">
-      <a href="index.php"><i class="fa-solid fa-book-open"></i> Materials</a>
+      <a href="materials.php"><i class="fa-solid fa-book-open"></i> Materials</a>
       <span><i class="fa-solid fa-chevron-right" style="font-size: 11px;"></i></span>
       <a href="post.php?id=<?php echo (int) $doc['post_id']; ?>"><?php echo sanitize($doc['post_title']); ?></a>
       <span><i class="fa-solid fa-chevron-right" style="font-size: 11px;"></i></span>

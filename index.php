@@ -1,147 +1,257 @@
 <?php
 /**
- * UDOM Student Materials - Home Page
- * Lists posts from MySQL with live title search, category filter and pagination (6 per page).
- * Works without JavaScript (normal links/forms); assets/js/main.js upgrades it to live updates.
+ * UDOM Student Materials - Home (welcome) page: index.php, so every host opens it first.
+ * Introduces the project: what the site is, what it contains, and how to use it.
+ * All numbers and the latest posts are loaded live from MySQL.
+ * The searchable materials list is materials.php (this file used to be landing.php).
  */
 
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/faq_data.php';
 
-// Read and validate the current filters from the URL
-$search = mb_substr(trim(input_text($_GET, 'q')), 0, 100);
-$category = normalize_category(input_text($_GET, 'category'));
-$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
-
-// Fetch the requested page of posts
-$result = get_posts_page($pdo, $search, $category, $page);
-$posts = $result['posts'];
-$total_posts = $result['total'];
-$page = $result['page'];
-$total_pages = $result['total_pages'];
-
-// Files students shared publicly, filtered by the same search and category
-try {
-  $shared = get_shared_files_page($pdo, $search, $category, 'any', 1, 8);
-} catch (PDOException $e) {
-  $shared = ['files' => [], 'total' => 0]; // Sharing tables not installed yet
+// Old links to the materials list (index.php?q=..., ?category=..., ?page=...) still work
+if (array_intersect_key($_GET, ['q' => 1, 'category' => 1, 'page' => 1, 'sort' => 1])) {
+    header('Location: materials.php?' . http_build_query($_GET), true, 301);
+    exit;
 }
 
-// Total for the "All" button (each category row already has its own post_count)
-$all_total = (int) $pdo->query('SELECT COUNT(*) FROM posts')->fetchColumn();
+$active_nav = 'landing';
+$page_title = 'Welcome';
+$meta_description = SITE_DESCRIPTION;
+$meta_canonical = ''; // the site root
 
-// Header highlights: "Categories" menu + the current category inside it
-$active_nav = $category !== '' ? 'categories' : 'home';
-$active_category = $category;
-$page_title = $category !== '' ? $category : 'Home';
-$meta_description = $category !== ''
-  ? ($category_row = find_category($category)) && $category_row['description'] ? $category_row['description'] : $category . ' study materials for University of Dodoma students.'
-  : 'Browse and search free study materials, lecture notes, past papers and campus news for University of Dodoma (UDOM) students.';
-$meta_canonical = 'index.php' . ($category !== '' ? '?category=' . rawurlencode($category) : '');
-$meta_noindex = $search !== '' || $page > 1; // Search results and deep pages are not indexed
+// Live statistics
+$total_posts = (int) $pdo->query('SELECT COUNT(*) FROM posts')->fetchColumn();
+$total_comments = (int) $pdo->query('SELECT COUNT(*) FROM comments')->fetchColumn();
+$last_update = $pdo->query('SELECT MAX(GREATEST(created_at, updated_at)) FROM posts')->fetchColumn();
+
+// Categories with descriptions, icons and post counts (managed by the admin)
+$categories = get_categories();
+
+// The 3 newest posts
+$latest_posts = $pdo->query(
+  'SELECT id, title, slug, category, excerpt, image, image_ratio, image_width, image_height, author, created_at,
+          (SELECT COUNT(*) FROM attachments a WHERE a.post_id = posts.id) AS attachment_count
+   FROM posts ORDER BY created_at DESC, id DESC LIMIT 3'
+)->fetchAll();
 
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<!-- Hero Section with Search -->
-<section class="hero-section">
-  <div class="container">
-    <h1 class="hero-title">UDOM Student Materials</h1>
-    <p class="hero-subtitle">
-      Study materials, design notes, history articles and official University of Dodoma news, all in one place.
-    </p>
+<!-- Hero -->
+<section class="landing-hero">
+  <div class="container landing-hero-inner">
+    <div class="landing-hero-text">
+      <span class="landing-eyebrow"><i class="fa-solid fa-building-columns"></i> University of Dodoma</span>
+      <h1 class="landing-title">Study materials for UDOM students, all in one place</h1>
+      <p class="landing-lead">
+        UDOM Student Materials is a free blog where students find course notes, design guides, history articles and
+        university news. Every post is written and checked by our team and kept up to date.
+      </p>
 
-    <div class="search-wrapper">
-      <form action="index.php" method="GET" class="search-form" id="search-form" role="search">
-        <?php if ($category !== ''): ?>
-          <input type="hidden" name="category" value="<?php echo sanitize($category); ?>" id="search-category">
-        <?php endif; ?>
-        <label for="live-search-input" class="visually-hidden">Search posts by title</label>
-        <input type="search" name="q" id="live-search-input" class="search-input"
-          placeholder="Search posts by title..." value="<?php echo sanitize($search); ?>" autocomplete="off"
-          maxlength="100">
+      <!-- Quick search: sends the visitor to the materials page with results -->
+      <form action="materials.php" method="GET" class="search-form landing-search" role="search">
+        <label for="landing-search" class="visually-hidden">Search posts by title</label>
+        <input type="search" name="q" id="landing-search" class="search-input"
+          placeholder="What do you want to study today?" maxlength="100" autocomplete="off">
         <button type="submit" class="search-btn">
           <i class="fa-solid fa-magnifying-glass"></i> <span class="search-btn-text">Search</span>
         </button>
       </form>
-    </div>
-  </div>
-</section>
 
-<!-- Category Filter -->
-<section class="filter-section">
-  <div class="container filter-wrapper">
-    <div class="filter-categories">
-      <a href="<?php echo sanitize(home_url($search, '')); ?>"
-        class="filter-btn <?php echo $category === '' ? 'active' : ''; ?>" data-category="">
-        <i class="fa-solid fa-layer-group"></i> All
-        <span class="filter-count"><?php echo $all_total; ?></span>
-      </a>
-      <?php /* One button per category in the database */ ?>
-      <?php foreach (get_categories() as $cat): ?>
-        <a href="<?php echo sanitize(home_url($search, $cat['name'])); ?>"
-          class="filter-btn <?php echo $category === $cat['name'] ? 'active' : ''; ?>"
-          data-category="<?php echo sanitize($cat['name']); ?>">
-          <i class="fa-solid <?php echo category_icon($cat['name']); ?>"></i> <?php echo sanitize($cat['name']); ?>
-          <span class="filter-count"><?php echo (int) $cat['post_count']; ?></span>
+      <div class="landing-actions">
+        <a href="materials.php" class="btn btn-accent">
+          <i class="fa-solid fa-book-open"></i> Browse All Materials
         </a>
-      <?php endforeach; ?>
+        <a href="#how-it-works" class="btn btn-ghost">
+          <i class="fa-solid fa-circle-info"></i> How It Works
+        </a>
+      </div>
     </div>
 
-    <div class="filter-status" id="results-count" aria-live="polite">
-      <?php echo render_results_summary($total_posts, $search, $category); ?>
+    <!-- Live stats -->
+    <div class="landing-stats" aria-label="Site statistics">
+      <div class="landing-stat">
+        <i class="fa-solid fa-file-lines"></i>
+        <strong><?php echo $total_posts; ?></strong>
+        <span>Published posts</span>
+      </div>
+      <div class="landing-stat">
+        <i class="fa-solid fa-folder-tree"></i>
+        <strong><?php echo count($categories); ?></strong>
+        <span>Categories</span>
+      </div>
+      <div class="landing-stat">
+        <i class="fa-solid fa-comments"></i>
+        <strong><?php echo $total_comments; ?></strong>
+        <span>Student comments</span>
+      </div>
+      <div class="landing-stat">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <strong><?php echo $last_update ? date('M d', strtotime($last_update)) : '-'; ?></strong>
+        <span>Last updated</span>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- Posts Grid -->
 <main class="main-content">
-  <div class="container">
-    <div class="section-header">
-      <h2 class="section-title">
-        <i class="fa-solid fa-book-open"></i> Latest Posts
-      </h2>
-      <span class="text-muted" id="page-indicator">Page <?php echo $page; ?> of <?php echo $total_pages; ?></span>
-    </div>
 
-    <!-- data-* attributes give main.js the starting state -->
-    <div class="posts-grid" id="posts-grid" data-page="<?php echo $page; ?>"
-      data-category="<?php echo sanitize($category); ?>">
-      <?php echo render_posts_grid($posts); ?>
+  <!-- About the project -->
+  <section class="landing-section">
+    <div class="container landing-about">
+      <div>
+        <h2 class="landing-section-title">What is UDOM Student Materials?</h2>
+        <p>
+          Finding reliable notes and official information at university can take a lot of time. Materials are spread
+          across WhatsApp groups, notice boards and old files. This website brings them together on one page, sorted
+          by topic and searchable by title.
+        </p>
+        <p>
+          Every article is stored in a database, so it stays available any time you come back, on your phone or your
+          laptop. You can read for free without creating an account, and you can leave a comment or question under
+          any post.
+        </p>
+      </div>
+      <ul class="landing-checklist">
+        <li><i class="fa-solid fa-circle-check"></i> Free to read, no account needed</li>
+        <li><i class="fa-solid fa-circle-check"></i> Works on phones, tablets and computers</li>
+        <li><i class="fa-solid fa-circle-check"></i> Instant search as you type</li>
+        <li><i class="fa-solid fa-circle-check"></i> Posts reviewed and updated by the team</li>
+        <li><i class="fa-solid fa-circle-check"></i> Comment and ask questions on every post</li>
+      </ul>
     </div>
+  </section>
 
-    <!-- Pagination (6 posts per page) -->
-    <div id="pagination-wrapper">
-      <?php echo render_pagination($page, $total_pages, $search, $category); ?>
-    </div>
-
-    <!-- Files shared by students (public uploads). Updated by live search too. -->
-    <section class="shared-section" aria-labelledby="shared-heading">
-      <div class="section-header">
-        <h2 class="section-title" id="shared-heading">
-          <i class="fa-solid fa-share-nodes"></i> Shared by Students
-          <span class="section-count" id="shared-count"><?php echo number_format($shared['total']); ?></span>
-        </h2>
-        <div class="section-actions">
-          <a href="account/upload.php" class="btn btn-outline btn-sm"><i class="fa-solid fa-cloud-arrow-up"></i> Share a file</a>
-          <a href="<?php echo sanitize('shared.php' . query_with(['page' => null])); ?>" class="btn btn-primary btn-sm" id="shared-all-link">
-            View all <i class="fa-solid fa-arrow-right"></i>
-          </a>
-        </div>
+  <!-- Categories -->
+  <section class="landing-section landing-section-alt">
+    <div class="container">
+      <div class="landing-section-head">
+        <h2 class="landing-section-title">What you will find</h2>
+        <p class="text-muted">
+          Posts are organised into <?php echo count($categories); ?>
+          categor<?php echo count($categories) === 1 ? 'y' : 'ies'; ?>. Pick one to start reading.
+        </p>
       </div>
 
-      <nav class="type-chips" aria-label="Shared file types">
-        <?php foreach (UPLOAD_TYPES as $key => [$label, $icon]): ?>
-          <a href="shared.php?type=<?php echo $key; ?><?php echo $category !== '' ? '&amp;category=' . rawurlencode($category) : ''; ?>" class="type-chip type-<?php echo $key; ?>">
-            <i class="fa-solid <?php echo $icon; ?>"></i> <?php echo $key === 'any' ? 'All files' : $label; ?>
+      <div class="landing-grid-3">
+        <?php foreach ($categories as $cat): ?>
+          <a href="<?php echo sanitize(home_url('', $cat['name'])); ?>" class="landing-card landing-card-link">
+            <span class="landing-card-icon"><i class="fa-solid <?php echo category_icon($cat['name']); ?>"></i></span>
+            <h3><?php echo sanitize($cat['name']); ?></h3>
+            <p><?php echo sanitize($cat['description'] ?: 'Browse all posts in ' . $cat['name'] . '.'); ?></p>
+            <span class="landing-card-footer">
+              <?php $n = (int) $cat['post_count']; echo $n . ' post' . ($n === 1 ? '' : 's'); ?>
+              <i class="fa-solid fa-arrow-right"></i>
+            </span>
           </a>
         <?php endforeach; ?>
-      </nav>
-
-      <div class="shared-grid" id="shared-grid">
-        <?php echo render_shared_grid($shared['files'], $search !== '' || $category !== '' ? 'No shared files match your search or category.' : 'No student has shared a file yet. Be the first!'); ?>
       </div>
-    </section>
-  </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="landing-section" id="how-it-works">
+    <div class="container">
+      <div class="landing-section-head">
+        <h2 class="landing-section-title">How it works</h2>
+        <p class="text-muted">Four simple steps from question to answer.</p>
+      </div>
+
+      <ol class="landing-steps">
+        <li class="landing-card">
+          <span class="landing-step-number">1</span>
+          <h3><i class="fa-solid fa-magnifying-glass"></i> Search</h3>
+          <p>Type a topic in the search bar. Results appear instantly while you type.</p>
+        </li>
+        <li class="landing-card">
+          <span class="landing-step-number">2</span>
+          <h3><i class="fa-solid fa-filter"></i> Filter</h3>
+          <p>Narrow the list to a single category with one click.</p>
+        </li>
+        <li class="landing-card">
+          <span class="landing-step-number">3</span>
+          <h3><i class="fa-solid fa-book-open-reader"></i> Read</h3>
+          <p>Open a post to read the full material, then share it with classmates.</p>
+        </li>
+        <li class="landing-card">
+          <span class="landing-step-number">4</span>
+          <h3><i class="fa-solid fa-comments"></i> Discuss</h3>
+          <p>Leave a comment or question under the post to help other students.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Latest posts (live from the database) -->
+  <section class="landing-section landing-section-alt">
+    <div class="container">
+      <div class="landing-section-head landing-section-head-row">
+        <div>
+          <h2 class="landing-section-title">Latest materials</h2>
+          <p class="text-muted">The newest posts added to the site.</p>
+        </div>
+        <a href="materials.php" class="btn btn-outline btn-sm">
+          View all posts <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+
+      <div class="posts-grid">
+        <?php if ($latest_posts): ?>
+          <?php echo render_posts_grid($latest_posts); ?>
+        <?php else: ?>
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+            <h3 class="empty-title">New materials are coming soon</h3>
+            <p class="empty-desc">Our team is preparing the first posts. Please check back shortly.</p>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </section>
+
+  <!-- Frequently asked questions (the featured ones; all of them are on faq.php) -->
+  <?php $landing_faq = faq_featured(); ?>
+  <?php if ($landing_faq): ?>
+  <section class="landing-section" id="faq">
+    <div class="container">
+      <div class="landing-section-head landing-section-head-row">
+        <div>
+          <h2 class="landing-section-title">Frequently asked questions</h2>
+          <p class="text-muted">Quick answers before you start.</p>
+        </div>
+        <a href="faq.php" class="btn btn-outline btn-sm">
+          All questions <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+
+      <div class="landing-faq">
+        <?php foreach ($landing_faq as [$q, $a]): ?>
+          <details class="faq-item">
+            <summary><span><?php echo sanitize($q); ?></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary>
+            <div class="faq-answer"><p><?php echo $a; // Trusted, written in includes/faq_data.php ?></p></div>
+          </details>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <!-- Call to action -->
+  <section class="landing-section landing-section-alt">
+    <div class="container">
+      <div class="landing-cta">
+        <div>
+          <h2>Ready to start studying?</h2>
+          <p>Browse every post, or search for the topic you need right now.</p>
+        </div>
+        <a href="materials.php" class="btn btn-accent">
+          <i class="fa-solid fa-book-open"></i> Explore Materials
+        </a>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

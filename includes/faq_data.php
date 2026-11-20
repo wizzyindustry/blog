@@ -1,6 +1,6 @@
 <?php
 /**
- * FAQ questions and answers, shared by faq.php (all of them) and landing.php (the featured ones).
+ * FAQ questions and answers, shared by faq.php (all of them) and index.php, the welcome page (the featured ones).
  * Each item: [question, answer HTML, featured?]. Answers are our own trusted HTML; links are
  * relative to the site root (both pages live there).
  */

@@ -1,6 +1,5 @@
-# Open the landing page first when visiting the project folder
-# (e.g. http://localhost/udom-blog). index.php remains the materials listing.
-DirectoryIndex landing.php index.php
+# index.php is the welcome page (every host opens it first); materials.php lists the study materials
+DirectoryIndex index.php
 
 AddType application/manifest+json .webmanifest
 

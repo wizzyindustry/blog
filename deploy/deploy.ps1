@@ -78,7 +78,7 @@ $LogFile = Join-Path $DeployRoot 'deploy.log'
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 # Pages that must work before (preview) and after (live) a switch
-$SmokePages = @('health.php', 'landing.php', 'index.php', 'shared.php', 'faq.php', 'privacy.php',
+$SmokePages = @('health.php', 'index.php', 'materials.php', 'shared.php', 'faq.php', 'privacy.php',
     'account/login.php', 'account/register.php', 'account/forgot_password.php', 'sitemap.xml', 'robots.txt')
 
 # ------------------------------------------------------------------ helpers

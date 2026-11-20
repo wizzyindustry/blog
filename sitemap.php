@@ -14,8 +14,8 @@ $add = function (string $path, ?string $lastmod = null, string $freq = 'weekly',
 };
 
 $latest_post = $pdo->query('SELECT MAX(COALESCE(updated_at, created_at)) FROM posts')->fetchColumn();
-$add('landing.php', $latest_post, 'daily', '1.0');
-$add('index.php', $latest_post, 'daily', '0.9');
+$add('', $latest_post, 'daily', '1.0');
+$add('materials.php', $latest_post, 'daily', '0.9');
 $add('shared.php', null, 'daily', '0.8');
 $add('faq.php', null, 'monthly', '0.4');
 $add('privacy.php', LEGAL_VERSION, 'yearly', '0.2');
@@ -24,7 +24,7 @@ $add('cookies.php', LEGAL_VERSION, 'yearly', '0.2');
 
 foreach (get_categories() as $cat) {
     if ((int) $cat['post_count'] > 0) {
-        $add('index.php?category=' . rawurlencode($cat['name']), null, 'weekly', '0.6');
+        $add('materials.php?category=' . rawurlencode($cat['name']), null, 'weekly', '0.6');
     }
 }
 foreach ($pdo->query('SELECT id, COALESCE(updated_at, created_at) AS m FROM posts ORDER BY id DESC LIMIT 20000') as $row) {

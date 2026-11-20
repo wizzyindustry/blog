@@ -53,7 +53,7 @@ try {
   <!-- Site Navigation Header -->
   <header class="site-header">
     <div class="container header-inner">
-      <a href="landing.php" class="brand-logo">
+      <a href="./" class="brand-logo">
         <span class="brand-icon"><i class="fa-solid fa-graduation-cap"></i></span>
         <span>UDOM Student Materials</span>
       </a>
@@ -68,12 +68,12 @@ try {
       <nav aria-label="Main navigation">
         <ul class="nav-menu" id="nav-menu">
           <li>
-            <a href="landing.php" class="nav-link <?php echo $active_nav === 'landing' ? 'active' : ''; ?>">
+            <a href="./" class="nav-link <?php echo $active_nav === 'landing' ? 'active' : ''; ?>">
               <i class="fa-solid fa-house"></i> Home
             </a>
           </li>
           <li>
-            <a href="index.php" class="nav-link <?php echo $active_nav === 'home' ? 'active' : ''; ?>">
+            <a href="materials.php" class="nav-link <?php echo $active_nav === 'home' ? 'active' : ''; ?>">
               <i class="fa-solid fa-book-open"></i> Materials
             </a>
           </li>

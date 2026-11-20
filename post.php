@@ -166,9 +166,9 @@ require_once __DIR__ . '/includes/header.php';
 
     <!-- Breadcrumb Navigation -->
     <nav class="breadcrumb-nav" aria-label="Breadcrumbs">
-      <a href="index.php"><i class="fa-solid fa-house"></i> Home</a>
+      <a href="./"><i class="fa-solid fa-house"></i> Home</a>
       <span><i class="fa-solid fa-chevron-right" style="font-size: 11px;"></i></span>
-      <a href="index.php?category=<?php echo urlencode($post['category']); ?>">
+      <a href="materials.php?category=<?php echo urlencode($post['category']); ?>">
         <?php echo sanitize($post['category']); ?>
       </a>
       <span><i class="fa-solid fa-chevron-right" style="font-size: 11px;"></i></span>

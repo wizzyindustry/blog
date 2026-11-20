@@ -3,7 +3,7 @@
  * Live Search & Filter API
  * Called by assets/js/main.js with ?q=&category=&page=
  * Returns JSON containing ready-to-insert HTML rendered by the same PHP
- * functions as index.php, so live results look identical to page loads.
+ * functions as materials.php, so live results look identical to page loads.
  */
 
 header('Content-Type: application/json; charset=utf-8');

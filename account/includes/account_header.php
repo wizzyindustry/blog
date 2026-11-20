@@ -64,9 +64,9 @@ $storage_pct = min(100, round(((int) $user['storage_used'] / USER_STORAGE_QUOTA)
         <?php endforeach; ?>
 
         <div class="sidebar-section">Explore</div>
-        <a href="../index.php" class="sidebar-link"><i class="fa-solid fa-book-open"></i><span>Study Materials</span></a>
+        <a href="../materials.php" class="sidebar-link"><i class="fa-solid fa-book-open"></i><span>Study Materials</span></a>
         <a href="../shared.php" class="sidebar-link"><i class="fa-solid fa-share-nodes"></i><span>Shared by Students</span></a>
-        <a href="../landing.php" class="sidebar-link"><i class="fa-solid fa-house"></i><span>Website Home</span></a>
+        <a href="../" class="sidebar-link"><i class="fa-solid fa-house"></i><span>Website Home</span></a>
       </nav>
 
       <div class="sidebar-footer">
@@ -116,7 +116,7 @@ $storage_pct = min(100, round(((int) $user['storage_used'] / USER_STORAGE_QUOTA)
               <a href="files.php" role="menuitem"><i class="fa-solid fa-folder-open"></i> My Files</a>
               <a href="upload.php" role="menuitem"><i class="fa-solid fa-cloud-arrow-up"></i> Upload Files</a>
               <a href="security.php" role="menuitem"><i class="fa-solid fa-shield-halved"></i> Password &amp; Security</a>
-              <a href="../index.php" role="menuitem"><i class="fa-solid fa-book-open"></i> Study Materials</a>
+              <a href="../materials.php" role="menuitem"><i class="fa-solid fa-book-open"></i> Study Materials</a>
               <form action="logout.php" method="POST" class="profile-dropdown-logout">
                 <?php echo csrf_field(); ?>
                 <button type="submit" role="menuitem" data-loading-text="Signing out...">

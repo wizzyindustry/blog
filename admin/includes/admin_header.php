@@ -85,7 +85,7 @@ $admin_nav = [
         <?php endforeach; ?>
 
         <div class="sidebar-section">Website</div>
-        <a href="../index.php" target="_blank" rel="noopener" class="sidebar-link">
+        <a href="../materials.php" target="_blank" rel="noopener" class="sidebar-link">
           <i class="fa-solid fa-arrow-up-right-from-square"></i><span>View Site</span>
         </a>
       </nav>
@@ -132,7 +132,7 @@ $admin_nav = [
               <a href="dashboard.php" role="menuitem"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
               <a href="users.php" role="menuitem"><i class="fa-solid fa-users"></i> Manage Users</a>
               <a href="posts.php" role="menuitem"><i class="fa-solid fa-newspaper"></i> Manage Posts</a>
-              <a href="../index.php" target="_blank" rel="noopener" role="menuitem"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Site</a>
+              <a href="../materials.php" target="_blank" rel="noopener" role="menuitem"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Site</a>
               <a href="password.php" role="menuitem"><i class="fa-solid fa-key"></i> Change Password</a>
               <form action="logout.php" method="POST" class="profile-dropdown-logout">
                 <?php echo csrf_field(); ?>

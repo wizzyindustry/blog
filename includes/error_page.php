@@ -97,7 +97,7 @@ function render_error_page(int $code, ?string $title = null, ?string $message = 
         . '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">'
         . '<link rel="stylesheet" href="' . $base . '/assets/css/style.css?v=' . (int) @filemtime(__DIR__ . '/../assets/css/style.css') . '">'
         . '</head><body class="error-body">'
-        . '<header class="error-header"><a href="' . $base . '/landing.php" class="brand-logo">'
+        . '<header class="error-header"><a href="' . $base . '/" class="brand-logo">'
         . '<span class="brand-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>UDOM Student Materials</span></a></header>'
         . '<main class="error-main"><div class="error-card" role="alert">'
         . '<div class="error-icon"><i class="fa-solid ' . $icon . '"></i></div>'
@@ -106,15 +106,15 @@ function render_error_page(int $code, ?string $title = null, ?string $message = 
         . '<p class="error-message">' . $e($message) . '</p>';
 
     if ($code === 404) {
-        echo '<form action="' . $base . '/index.php" method="GET" class="error-search" role="search">'
+        echo '<form action="' . $base . '/materials.php" method="GET" class="error-search" role="search">'
             . '<label for="error-q" class="visually-hidden">Search study materials</label>'
             . '<input type="search" id="error-q" name="q" class="form-control" placeholder="Search study materials..." maxlength="100">'
             . '<button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Search</button></form>';
     }
 
     echo '<div class="error-actions">'
-        . '<a href="' . $base . '/landing.php" class="btn btn-primary"><i class="fa-solid fa-house"></i> Home</a>'
-        . '<a href="' . $base . '/index.php" class="btn btn-outline"><i class="fa-solid fa-book-open"></i> Study Materials</a>';
+        . '<a href="' . $base . '/" class="btn btn-primary"><i class="fa-solid fa-house"></i> Home</a>'
+        . '<a href="' . $base . '/materials.php" class="btn btn-outline"><i class="fa-solid fa-book-open"></i> Study Materials</a>';
     if ($code === 401 || $code === 403) {
         echo '<a href="' . $base . '/account/login.php" class="btn btn-outline"><i class="fa-solid fa-right-to-bracket"></i> Sign In</a>';
     }

@@ -23,11 +23,11 @@
       <div class="footer-col">
         <h3>Quick Navigation</h3>
         <ul class="footer-links">
-          <li><a href="landing.php"><i class="fa-solid fa-chevron-right"></i> Home</a></li>
-          <li><a href="index.php"><i class="fa-solid fa-chevron-right"></i> All Materials</a></li>
+          <li><a href="./"><i class="fa-solid fa-chevron-right"></i> Home</a></li>
+          <li><a href="materials.php"><i class="fa-solid fa-chevron-right"></i> All Materials</a></li>
           <li><a href="shared.php"><i class="fa-solid fa-chevron-right"></i> Shared by Students</a></li>
           <li><a href="account/upload.php"><i class="fa-solid fa-chevron-right"></i> Share a File</a></li>
-          <li><a href="landing.php#how-it-works"><i class="fa-solid fa-chevron-right"></i> How It Works</a></li>
+          <li><a href="./#how-it-works"><i class="fa-solid fa-chevron-right"></i> How It Works</a></li>
           <li><a href="faq.php"><i class="fa-solid fa-chevron-right"></i> FAQ</a></li>
         </ul>
       </div>
@@ -44,7 +44,7 @@
               </a>
             </li>
           <?php endforeach; ?>
-          <li><a href="index.php"><i class="fa-solid fa-layer-group"></i> All Materials</a></li>
+          <li><a href="materials.php"><i class="fa-solid fa-layer-group"></i> All Materials</a></li>
         </ul>
       </div>
     </div>

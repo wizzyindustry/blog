@@ -22,7 +22,7 @@ browser restarts and server restarts.
    (Any folder name works, because all links are relative. This copy currently lives at
    `C:/xampp/htdocs/blog`, so it is also reachable at <http://localhost/blog>.)
 4. **Open the site.** Go to <http://localhost/udom-blog>.
-   This opens the **landing page** (`landing.php`). The materials list is `index.php`.
+   This opens the **home page** (`index.php`). The materials list is `materials.php`.
    Admin panel: <http://localhost/udom-blog/admin/login.php>. This address is deliberately not linked anywhere
    on the public site, so bookmark it.
 
@@ -63,9 +63,10 @@ config/db.php                 PDO connection (loads includes/functions.php)
 includes/functions.php        Shared helpers: categories, queries, rendering, uploads, CSRF, validation
 includes/header.php           Public site header and navigation
 includes/footer.php           Public site footer
-landing.php                   Landing page: explains the project, live stats, categories, latest posts
-.htaccess                     Opens landing.php first; blocks web access to config/, includes/, sql/
-index.php                     Materials: hero search, category filter, post grid, pagination (6 per page)
+index.php                     Home page (every host opens it first): project intro, live stats, categories, latest posts, FAQ
+materials.php                 Materials: hero search, category filter, post grid, pagination (6 per page)
+landing.php                   Old home page address: redirects (301) to the site root
+.htaccess                     DirectoryIndex index.php; blocks web access to config/, includes/, sql/
 post.php?id=                  Single post: image, meta, content, share buttons, comments
 search-api.php                JSON endpoint used by live search / filter / pagination
 view.php?id=                  Document viewer (PDF / Word / PowerPoint preview, then download)
@@ -128,7 +129,7 @@ sql/database.sql              Full schema and sample data for phpMyAdmin
   3. Optional title, category and description.
 - Students can change visibility at any time with one click in **My Files**, or edit the details
   with the pencil button.
-- **Public files** appear in a "Shared by Students" section on `index.php` (it follows the search
+- **Public files** appear in a "Shared by Students" section on `materials.php` (it follows the search
   and category filter), on `shared.php` (filter by type and category), and each has its own page,
   `shared_file.php?id=` (preview for images, PDF, video, audio and text; download for everything).
   Guests can view and download public files; private files stay private.
